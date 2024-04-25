@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DayConfig" load_steps=2 format=3 uid="uid://box57qhyqsg2p"]
+
+[ext_resource type="Script" path="res://addons/day_night/resources/scripts/day_config.gd" id="1_0vd3m"]
+
+[resource]
+script = ExtResource("1_0vd3m")
+has_night = true
+day_name = "Normal"
+sunrise_hour = 6
+sunrise_minute = 0
+sunrise_second = 0
+sunrise_millisecond = 0
+sunset_hour = 18
+sunset_minute = 0
+sunset_second = 0
+sunset_millisecond = 0
