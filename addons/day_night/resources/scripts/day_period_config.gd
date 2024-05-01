@@ -1,53 +1,95 @@
 extends Resource
 class_name DayPeriodConfig
 
-@export_category("Day Configuration")
-## Determines if the day will have a sunrise and/or sunset
-@export var has_night: bool = true
+@export_category("Day Period Configuration")
 
-@export_placeholder("Some Nickname") var day_name: String
+@export_placeholder("Event Name") var period_name: String
 
-@export_group("Sunrise Time")
+@export_color_no_alpha() var period_color: Color
+#@export() var weather_condition: Node = null
+
+@export_group("Start Time")
 ## Clamped between 0-23
-@export_range(0,23) var sunrise_hour: int = 0 :
+@export_range(0,23) var start_hour: int = 0 :
 	set(value):
-		sunrise_hour = clamp(value,0,23)
+		start_hour = clamp(value,0,23)
 ## Clamped between 0-59
-@export_range(0,59) var sunrise_minute: int = 0 :
+@export_range(0,59) var start_minute: int = 0 :
 	set(value):
-		sunrise_minute = clamp(value,0,59)
+		start_minute = clamp(value,0,59)
 ## Clamped between 0-59
-@export_range(0,59) var sunrise_second: int = 0 :
+@export_range(0,59) var start_second: int = 0 :
 	set(value):
-		sunrise_second = clamp(value,0,59)
+		start_second = clamp(value,0,59)
 ## Clamped between 0-999
-@export_range(0,999) var sunrise_millisecond: int = 0 :
+@export_range(0,999) var start_millisecond: int = 0 :
 	set(value):
-		sunrise_millisecond = clamp(value,0,999)
+		start_millisecond = clamp(value,0,999)
 
-@export_group("Sunset Time")
-## Clamped between sunrise_hour-23
-@export_range(0,23) var sunset_hour: int = 0 :
+@export_group("Length of Time")
+## Clamped between 0-23
+@export_range(0,23) var length_hour: int = 0 :
 	set(value):
-		sunset_hour = clamp(value,sunrise_hour,23)
-## Clamped between sunrise_minute-59
-@export_range(0,59) var sunset_minute: int = 0 :
+		length_hour = clamp(value,0,23)
+## Clamped between 0-59
+@export_range(0,59) var length_minute: int = 0 :
 	set(value):
-		var min_value: int = sunrise_minute if sunset_hour == sunrise_hour else 0
-		sunset_minute = clamp(value,min_value,59)
-## Clamped between sunrise_second-59
-@export_range(0,59) var sunset_second: int = 0 :
+		length_minute = clamp(value,0,59)
+## Clamped between 0-59
+@export_range(0,59) var length_second: int = 0 :
 	set(value):
-		var min_value: int = sunrise_second if sunset_minute == sunrise_minute else 0
-		sunset_second = clamp(value,min_value,59)
-## Clamped between sunrise_millisecond-999
-@export_range(0,999) var sunset_millisecond: int = 0 :
+		length_second = clamp(value,0,59)
+## Clamped between 0-999
+@export_range(0,999) var length_millisecond: int = 0 :
 	set(value):
-		var min_value: int = sunrise_millisecond if sunset_second == sunrise_second else 0
-		sunset_millisecond = clamp(value,min_value,999)
+		length_millisecond = clamp(value,0,999)
 
-func get_sunrise() -> Instant:
-	return Instant.new(0,0,sunrise_hour,sunrise_minute,sunrise_second,sunrise_millisecond)
+@export_group("Weather Conditions")
+@export var weather_conditions: Array[WeatherConfig] = []
 
-func get_sunset() -> Instant:
-	return Instant.new(0,0,sunset_hour,sunset_minute,sunset_second,sunset_millisecond)
+func get_period_name() -> String:
+	return period_name
+
+func get_period_color() -> Color:
+	return period_color
+
+func get_start() -> Instant:
+	return Instant.new(0,0,start_hour,start_minute,start_second,start_millisecond)
+
+func get_start_time() -> GameTime:
+	return GameTime.create_from_time(get_start())
+
+func get_duration() -> Duration:
+	return Duration.create_from_length(get_start(),0,0,length_hour,length_minute,length_second,length_millisecond)
+
+func get_end() -> Instant:
+	return get_duration().get_end().to_instant()
+
+func get_end_time() -> GameTime:
+	return get_duration().get_end()
+
+func has_weather() -> bool:
+	return weather_conditions.size() > 0
+
+func pick_weather() -> WeatherConfig:
+	if has_weather():
+		return pick_weighted_element(weather_conditions)
+	return null
+
+
+func pick_weighted_element(weather_configs: Array[WeatherConfig])-> WeatherConfig:
+	var total_weight: int = 0
+	for weather_config in weather_configs:
+		total_weight += weather_config.weather_weight
+
+	var random_value: int = randi_range(0,total_weight)
+
+	var current_weight: int = 0
+
+	for weather_config in range(weather_configs.size()):
+		current_weight += weather_configs[weather_config].weather_weight
+		if random_value <= current_weight:
+			return weather_configs[weather_config]
+
+	# If random_value exceeds all weights (unlikely), return the last element
+	return weather_configs[weather_configs.size() - 1]

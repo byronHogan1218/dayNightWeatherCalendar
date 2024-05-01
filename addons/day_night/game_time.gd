@@ -151,6 +151,9 @@ func get_hour() -> int:
 func get_day() -> int:
 	return _day
 
+func to_instant() -> Instant:
+	return Instant.new(self.get_year(), self.get_day(), self.get_hour(), self.get_minute(), self.get_second(), self.get_millisecond())
+
 func get_time_as_string() -> String:
 	return str(get_hour()) + ":" + str(get_minute()) + ":" + str(get_second()) + ":" + str(get_millisecond())
 

@@ -6,6 +6,8 @@ class_name DayConfig
 @export var has_night: bool = true
 
 @export_placeholder("Some Nickname") var day_name: String
+@export_color_no_alpha() var day_color: Color
+@export_color_no_alpha() var night_color: Color
 
 @export_group("Sunrise Time")
 ## Clamped between 0-23
@@ -45,6 +47,18 @@ class_name DayConfig
 	set(value):
 		var min_value: int = sunrise_millisecond if sunset_second == sunrise_second else 0
 		sunset_millisecond = clamp(value,min_value,999)
+
+@export_group("Day Periods")
+@export var day_periods: Array[DayPeriodConfig] = []
+
+func get_day_name() -> String:
+	return day_name
+
+func get_day_time_color() -> Color:
+	return day_color
+
+func get_night_time_color() -> Color:
+	return night_color
 
 func get_sunrise() -> Instant:
 	return Instant.new(0,0,sunrise_hour,sunrise_minute,sunrise_second,sunrise_millisecond)

@@ -4,6 +4,8 @@ const _MIN_DAY_LENGTH: int = 3
 const _FULL_DAY_PERCENTAGE: int = 1
 const _MAX_DAY_LENGTH: int = 8640000 # 100 * an earth day length in seconds
 const _MAX_TIME_MULTIPLIER: float = 100.0
+const _AUTO_COLOR_TRANSTION: float = 0.05;
+
 
 @export var sun: DirectionalLight3D
 @export var day_lenth_in_seconds: int = 5 :
@@ -50,7 +52,11 @@ var _reminders: Dictionary = {}
 var _repeating_reminders: Dictionary = {}
 var _todays_reminders: Array[Variant] = []
 var _reminder_index: int = 0
+var _day_period_index: int = 0
+var _has_day_periods: bool = false
+var _active_period: DayPeriodConfig = null
 var _game_time_this_frame: GameTime
+var _color_lerp_time: float = 0
 
 
 var _last_percentage_through_day: float = 0
@@ -97,6 +103,10 @@ func _ready() -> void:
 #	on_night_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("night time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 	print("setting time this frame to: " + _game_time_this_frame.get_date_as_string() + " - " + _game_time_this_frame.get_time_as_string())
 	alter_time_speed(10, _game_time_this_frame.add_unit(4,TimeUnit.DAY))
+	# sort day periods
+	if (day_config != null) && (day_config.day_periods != null):
+		_has_day_periods = true
+		day_config.day_periods.sort_custom(func(a, b): return a.start_time < b.start_time)
 
 func clear_console(num):
 	for i in range(num):
@@ -126,11 +136,13 @@ func _process(delta: float):
 		var rotation: Vector3 = _get_sun_rotation()
 		sun.rotation.x = deg_to_rad(rotation.x)
 		sun.rotation.y = deg_to_rad(rotation.y)
+		sun.set_color(_get_sun_color(delta))
 
 func _update_day_state(should_trigger_events: bool = true):
 	if (_percentage_through_day < _sunset_start_percentage) && (_percentage_through_day > _sunrise_start_percentage):
 		if not _is_day:
 			# Just turned day
+			_color_lerp_time = 0
 			_is_day = true
 			if should_trigger_events:
 				_on_day_time_start.on_next(GameTime.new(_game_time_this_frame.get_epoch()))
@@ -142,6 +154,7 @@ func _update_day_state(should_trigger_events: bool = true):
 		#test
 		if _is_day:
 			# just turned night
+			_color_lerp_time = 0
 			_is_day = false
 			if should_trigger_events:
 				_on_night_time_start.on_next(GameTime.new(_game_time_this_frame.get_epoch()))
@@ -150,6 +163,21 @@ func _update_day_state(should_trigger_events: bool = true):
 			# it has been night
 			# DO NOTHING FOR NOW
 
+	if _has_day_periods:
+		if (_day_period_index < day_config.day_periods.size()) && _game_time_this_frame.is_before_or_same(day_config.day_periods[_day_period_index].get_start_time()):
+			# TODO: trigger event for when day period changes
+			_color_lerp_time = 0
+			if _active_period != null:
+				# TODO: trigger event overwriting day period
+				var t = 0
+
+			_active_period = day_config.day_periods[_day_period_index]
+			_day_period_index =  _day_period_index + 1
+	if _active_period != null:
+		if _game_time_this_frame.is_after_or_same(_active_period.get_end_time()):
+			# TODO: trigger event for when day period ends
+			_active_period = null
+			_color_lerp_time = 0
 
 func handle_day_end():
 	var old_date = GameTime.new(_current_date_at_start_of_day.get_epoch())
@@ -157,6 +185,7 @@ func handle_day_end():
 	_on_day_change.on_next(_current_date_at_start_of_day)
 	if not _current_date_at_start_of_day.is_same(old_date, TimeUnit.YEARS):
 		_on_year_change.on_next(_current_date_at_start_of_day)
+	# TODO: advance day config here?
 
 	_percentage_through_day -= _FULL_DAY_PERCENTAGE
 	if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
@@ -214,6 +243,25 @@ func get_time_this_frame() -> GameTime:
 
 func get_time_speed_multiplier() -> float:
 	return _time_speed_multiplier
+
+
+func _get_sun_color(delta: float, immediate: bool = false) -> Color:
+	if (_color_lerp_time > 1):
+		return sun.get_color();
+	_color_lerp_time += delta / (day_lenth_in_seconds * _AUTO_COLOR_TRANSTION)
+	var new_color: Color
+	if(_active_period != null):
+		new_color = _active_period.get_period_color()
+	elif _is_day:
+		new_color = day_config.get_day_time_color()
+	else:
+		new_color = day_config.get_night_time_color()
+
+	if immediate:
+		_color_lerp_time=2
+		return new_color
+	else:
+		return lerp(sun.get_color(), new_color, _color_lerp_time) as Color
 
 func _get_sun_rotation() -> Vector3:
 	var angle: float
