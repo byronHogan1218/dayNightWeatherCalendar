@@ -1,8 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://drr7mt8ifxu11"]
-
-[ext_resource type="Script" path="res://addons/day_night/day_night_cycle.gd" id="1_qlxy3"]
-
-[node name="Test" type="Node3D"]
-
-[node name="DayNightCycle" type="Node" parent="."]
-script = ExtResource("1_qlxy3")

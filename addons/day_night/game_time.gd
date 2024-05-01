@@ -3,7 +3,6 @@ class_name GameTime
 var _epoch:int # in milliseconds
 
 const MILLISECONDS_IN_DAY: int = 86400000
-const YEAR_DIVISOR: int = 31_536_000_000
 const DAY_DIVISOR: int = 86_400_000
 const HOUR_DIVISOR: int = 3_600_000
 const MINUTE_DIVISOR: int = 60_000
@@ -13,6 +12,7 @@ const MINUTES_IN_HOUR: int = 60
 const SECONDS_IN_MINUTE: int = 60
 const MILLISECONDS_IN_SECOND: int = 1000
 static var DAYS_IN_YEAR: int = -1
+static var YEAR_DIVISOR: int = -1
 
 var _year: int
 var _day: int
@@ -20,6 +20,7 @@ var _hour: int
 var _minute: int
 var _second: int
 var _millisecond: int
+
 
 func _init(epoch:int):
 	self._epoch = epoch
@@ -31,7 +32,7 @@ func _init(epoch:int):
 	var working_epoch: int = epoch
 	self._year = working_epoch / YEAR_DIVISOR
 	working_epoch -= self._year * YEAR_DIVISOR
-	self._day = (working_epoch / DAY_DIVISOR) % 365
+	self._day = (working_epoch / DAY_DIVISOR)
 	working_epoch -= self._day * DAY_DIVISOR
 	self._hour =(working_epoch / HOUR_DIVISOR) % 24
 	working_epoch -= self._hour * HOUR_DIVISOR
