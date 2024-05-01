@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://1rwjebm5rolk"]
+[gd_scene load_steps=7 format=3 uid="uid://1rwjebm5rolk"]
 
 [ext_resource type="Script" path="res://addons/day_night/day_night_cycle.gd" id="1_fe7bq"]
 [ext_resource type="Script" path="res://addons/day_night/example/3d_world/scripts/3d_world.gd" id="1_nxd1w"]
 [ext_resource type="Resource" uid="uid://box57qhyqsg2p" path="res://addons/day_night/resources/normal.tres" id="2_kh4i3"]
+[ext_resource type="PackedScene" uid="uid://gfv43oe5s608" path="res://addons/day_night/example/3d_world/weather.tscn" id="4_0b4wp"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_7kbuq"]
 
@@ -54,3 +55,5 @@ offset_right = 358.0
 offset_bottom = 288.0
 text = "TIME MULTIPLIER"
 horizontal_alignment = 1
+
+[node name="Weather" parent="." instance=ExtResource("4_0b4wp")]

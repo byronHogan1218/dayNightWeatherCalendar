@@ -21,14 +21,8 @@ var _minute: int
 var _second: int
 var _millisecond: int
 
-
 func _init(epoch:int):
 	self._epoch = epoch
-#	self._second = floor(epoch / SECOND_DIVISOR) % 60
-#	self._minute = floor(epoch / MINUTE_DIVISOR) % 60
-#	self._hour = floor(epoch / HOUR_DIVISOR) % 24
-#	self._day = floor(epoch / DAY_DIVISOR) % 365
-#	self._year = floor(epoch / YEAR_DIVISOR)
 	var working_epoch: int = epoch
 	self._year = working_epoch / YEAR_DIVISOR
 	working_epoch -= self._year * YEAR_DIVISOR
@@ -163,14 +157,38 @@ func get_time_as_string() -> String:
 func get_date_as_string() -> String:
 	return str(get_year()) + "-" + str(get_day())
 
+static func is_in_range(time: GameTime, start: GameTime, end: GameTime) -> bool:
+	if (start == null) or (end == null):
+		push_error("Invalid time range: Must speficy start and end time")
+		return false
+	if start == null:
+		push_error("Invalid time range: Must speficy start time")
+		return false
+	if end == null:
+		push_error("Invalid time range: Must speficy end time")
+		return false
+	if start.is_after(end):
+		push_error("Invalid time range: Start time must be before end time")
+		return false
+	return time.is_after_or_same(start) and time.is_before_or_same(end)
+
+static func random_time_in_range(start: GameTime, end: GameTime) -> GameTime:
+	if (start == null) or (end == null):
+		push_error("Invalid time range: Must speficy start and end time")
+		return null
+	if start == null:
+		push_error("Invalid time range: Must speficy start time")
+		return null
+	if end == null:
+		push_error("Invalid time range: Must speficy end time")
+		return null
+	if start.is_after(end):
+		push_error("Invalid time range: Start time must be before end time")
+		return null
+	var max_epoch: int = end.get_epoch() - start.get_epoch()
+	var random = randi_range(0, max_epoch)
+	return GameTime.new(start.get_epoch() + random)
+
 #static func create_from_time(year:int, days: int, hours: int, minutes: int, seconds: int, milliseconds: int) -> GameTime:
 static func create_from_time(time: Instant) -> GameTime:
 	return GameTime.new(time.get_year() * YEAR_DIVISOR + time.get_day() * DAY_DIVISOR + time.get_hour() * HOUR_DIVISOR + time.get_minute() * MINUTE_DIVISOR + time.get_second() * SECOND_DIVISOR + time.get_millisecond())
-
-static func create_from_game_time(game_time: GameTime, year:int = -1, days: int =-1, hours: int =-1, minutes: int =-1, seconds: int =-1) -> GameTime:
-	var year_to_set: int = year if year >= 0 else game_time.get_year()
-	var days_to_set: int = days if days >= 0 else game_time.get_day()
-	var hours_to_set: int = hours if hours >= 0 else game_time.get_hour()
-	var minutes_to_set: int = minutes if minutes >= 0 else game_time.get_minute()
-	var seconds_to_set: int = seconds if seconds >= 0 else game_time.get_second()
-	return GameTime.new((year_to_set * YEAR_DIVISOR) + (days_to_set * DAY_DIVISOR) + (hours_to_set * HOUR_DIVISOR) + (minutes_to_set * MINUTE_DIVISOR) + seconds_to_set)

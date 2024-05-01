@@ -66,7 +66,7 @@ func _ready() -> void:
 	#else:
 		#push_error("DayNightCycle singleton already exists!")
 		#return
-#	print("Day Night Cycle Ready: ", rng.randi() )
+	#print("Day Night Cycle Ready: ", rng.randi() )
 
 	GameTime.DAYS_IN_YEAR = days_in_year
 #	const YEAR_DIVISOR: int = 31_536_000_000
@@ -254,7 +254,7 @@ func create_reminder(time: GameTime, repeating: bool = false) -> Observable:
 	# If the reminder is for today and is after now, we need to add it to the list of reminders for today
 	if time.is_today(_game_time_this_frame) and time.is_after(_game_time_this_frame):
 		if repeating:
-			var new_time = time.add_unit(1, TimeUnit.DAY)
+			var new_time: GameTime = time.add_unit(1, TimeUnit.DAY)
 			if not _repeating_reminders.has(new_time.get_date_as_string()):
 				_repeating_reminders[new_time.get_date_as_string()] = []
 			_repeating_reminders[new_time.get_date_as_string()].append({"observable": observable, "time": new_time})
