@@ -29,7 +29,7 @@ script = ExtResource("1_fe7bq")
 sun = NodePath("../Sun")
 day_lenth_in_seconds = 50
 days_in_year = 3
-start_hour = 10
+start_hour = 3
 day_config = ExtResource("2_kh4i3")
 
 [node name="Camera3D" type="Camera3D" parent="."]
@@ -54,6 +54,14 @@ offset_top = 194.0
 offset_right = 358.0
 offset_bottom = 288.0
 text = "TIME MULTIPLIER"
+horizontal_alignment = 1
+
+[node name="Sun intensity" type="Label" parent="."]
+offset_left = 1.0
+offset_top = 236.0
+offset_right = 359.0
+offset_bottom = 330.0
+text = "SUN INTENSITY"
 horizontal_alignment = 1
 
 [node name="Weather" parent="." instance=ExtResource("4_0b4wp")]

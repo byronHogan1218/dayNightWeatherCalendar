@@ -2,12 +2,15 @@ extends Resource
 class_name DayConfig
 
 @export_category("Day Configuration")
-## Determines if the day will have a sunrise and/or sunset
+## TODO: implement...Determines if the day will have a sunrise and/or sunset
 @export var has_night: bool = true
 
 @export_placeholder("Some Nickname") var day_name: String
 @export_color_no_alpha() var day_color: Color
+@export() var day_time_light_intensity: float = 10
 @export_color_no_alpha() var night_color: Color
+@export() var night_time_light_intensity: float
+@export() var minimum_light_intensity: float
 
 @export_group("Sunrise Time")
 ## Clamped between 0-23
@@ -63,5 +66,11 @@ func get_night_time_color() -> Color:
 func get_sunrise() -> Instant:
 	return Instant.new(0,0,sunrise_hour,sunrise_minute,sunrise_second,sunrise_millisecond)
 
+func get_sunrise_time() -> GameTime:
+	return GameTime.create_from_time(get_sunrise())
+
 func get_sunset() -> Instant:
 	return Instant.new(0,0,sunset_hour,sunset_minute,sunset_second,sunset_millisecond)
+
+func get_sunset_time() -> GameTime:
+	return GameTime.create_from_time(get_sunset())

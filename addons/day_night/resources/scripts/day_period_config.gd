@@ -53,20 +53,20 @@ func get_period_name() -> String:
 func get_period_color() -> Color:
 	return period_color
 
-func get_start() -> Instant:
-	return Instant.new(0,0,start_hour,start_minute,start_second,start_millisecond)
+func get_start(year: int, day: int) -> Instant:
+	return Instant.new(year,day,start_hour,start_minute,start_second,start_millisecond)
 
-func get_start_time() -> GameTime:
-	return GameTime.create_from_time(get_start())
+func get_start_time(year: int, day: int) -> GameTime:
+	return GameTime.create_from_time(get_start(year,day))
 
-func get_duration() -> Duration:
-	return Duration.create_from_length(get_start(),0,0,length_hour,length_minute,length_second,length_millisecond)
+func get_duration(start_year: int, start_day: int) -> Duration:
+	return Duration.create_from_length(get_start(start_year,start_day),0,0,length_hour,length_minute,length_second,length_millisecond)
 
-func get_end() -> Instant:
-	return get_duration().get_end().to_instant()
+func get_end(start_year: int, start_day: int) -> Instant:
+	return get_duration(start_year,start_day).get_end().to_instant()
 
-func get_end_time() -> GameTime:
-	return get_duration().get_end()
+func get_end_time(start_year: int, start_day: int) -> GameTime:
+	return get_duration(start_year,start_day).get_end()
 
 func has_weather() -> bool:
 	return weather_conditions.size() > 0
