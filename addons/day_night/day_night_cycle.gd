@@ -73,12 +73,7 @@ var _day_config: DayConfig = null
 var _sunrise_today: GameTime
 var _sunset_today: GameTime
 var _middle_of_day_time: GameTime
-var _middle_of_night_time: GameTime
 
-var _light_intensity: float = 0.0
-var _light_color: Color = Color(0.0, 0.0, 0.0, 1.0)
-
-var _last_percentage_through_day: float = 0
 var _is_day: bool = false
 
 #var rng := RandomNumberGenerator.new()
@@ -142,7 +137,6 @@ func clear_console(num):
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float):
-	_last_percentage_through_day = _percentage_through_day
 	if not _time_stopped:
 		_percentage_through_day += (delta / day_lenth_in_seconds) * _time_speed_multiplier;
 		_send_potential_reminders()
