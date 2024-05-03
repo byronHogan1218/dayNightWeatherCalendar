@@ -5,7 +5,11 @@
 [resource]
 script = ExtResource("1_76nly")
 period_name = "GREEN"
-period_color = Color(0, 1, 0, 1)
+day_time_period_color = Color(0, 1, 0, 1)
+day_time_light_intensity = 2.0
+night_time_period_color = Color(0, 0.278431, 0, 1)
+night_time_light_intensity = 0.8
+minimum_light_intensity = 0.1
 start_hour = 15
 start_minute = 0
 start_second = 0

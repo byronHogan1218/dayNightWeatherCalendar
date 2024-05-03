@@ -30,7 +30,7 @@ sun = NodePath("../Sun")
 day_lenth_in_seconds = 50
 days_in_year = 3
 start_hour = 3
-day_config = ExtResource("2_kh4i3")
+default_day_config = ExtResource("2_kh4i3")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.940395, 0.340084, 0, -0.340084, 0.940395, 0, 1.47507, 2.99081)

@@ -5,8 +5,18 @@ class_name DayPeriodConfig
 
 @export_placeholder("Event Name") var period_name: String
 
-@export_color_no_alpha() var period_color: Color
-#@export() var weather_condition: Node = null
+@export_group("Period Lighting")
+## The lighting color that will be used at day
+@export_color_no_alpha() var day_time_period_color: Color
+## The peak light intensity during the day
+@export_range(0,16,.01) var day_time_light_intensity: float = 2
+## The lighting color that will be used at night
+@export_color_no_alpha() var night_time_period_color: Color
+## The peak light intensity during the night
+@export_range(0,16,.01) var night_time_light_intensity: float = .8
+## The the lowest the light intensity can be
+@export_range(0,16,.01) var minimum_light_intensity: float = .1
+
 
 @export_group("Start Time")
 ## Clamped between 0-23
@@ -50,9 +60,6 @@ class_name DayPeriodConfig
 func get_period_name() -> String:
 	return period_name
 
-func get_period_color() -> Color:
-	return period_color
-
 func get_start(year: int, day: int) -> Instant:
 	return Instant.new(year,day,start_hour,start_minute,start_second,start_millisecond)
 
@@ -73,11 +80,11 @@ func has_weather() -> bool:
 
 func pick_weather() -> WeatherConfig:
 	if has_weather():
-		return pick_weighted_element(weather_conditions)
+		return _pick_weighted_element(weather_conditions)
 	return null
 
 
-func pick_weighted_element(weather_configs: Array[WeatherConfig])-> WeatherConfig:
+func _pick_weighted_element(weather_configs: Array[WeatherConfig])-> WeatherConfig:
 	var total_weight: int = 0
 	for weather_config in weather_configs:
 		total_weight += weather_config.weather_weight

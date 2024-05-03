@@ -11,6 +11,7 @@ day_color = Color(0.894118, 0.92549, 0.584314, 1)
 day_time_light_intensity = 5.0
 night_color = Color(0.0823529, 0.0352941, 0.513726, 1)
 night_time_light_intensity = 1.0
+minimum_light_intensity = 0.2
 sunrise_hour = 6
 sunrise_minute = 0
 sunrise_second = 0
