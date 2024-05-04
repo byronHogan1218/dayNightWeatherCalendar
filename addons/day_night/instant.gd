@@ -7,8 +7,9 @@ var _hour: int
 var _minute: int
 var _second: int
 var _millisecond: int
+var _is_negative: bool
 
-func _init(year: int, days: int, hours: int, minutes: int, seconds: int, milliseconds: int):
+func _init(year: int, days: int, hours: int, minutes: int, seconds: int, milliseconds: int, is_negative: bool = false):
 	self._year = year
 	self._day = days
 	self._hour = hours
@@ -21,9 +22,12 @@ func _init(year: int, days: int, hours: int, minutes: int, seconds: int, millise
 	var minutes_milliseconds: int = self._minute * GameTime.MINUTE_DIVISOR
 	var seconds_milliseconds: int = self._second * GameTime.SECOND_DIVISOR
 
+	self._is_negative = is_negative
 	self._epoch = year_milliseconds + days_milliseconds + hours_milliseconds + minutes_milliseconds + seconds_milliseconds + milliseconds
 
 func get_epoch() -> int:
+	if is_before_year_zero():
+		return -1 * self._epoch
 	return self._epoch
 
 func get_year() -> int:
@@ -43,5 +47,8 @@ func get_second() -> int:
 
 func get_millisecond() -> int:
 	return self._millisecond
+
+func is_before_year_zero() -> bool:
+	return self._is_negative
 
 

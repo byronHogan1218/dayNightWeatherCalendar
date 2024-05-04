@@ -4,7 +4,8 @@ const _MIN_DAY_LENGTH: int = 3
 const _FULL_DAY_PERCENTAGE: int = 1
 const _MAX_DAY_LENGTH: int = 8640000 # 100 * an earth day length in seconds
 const _MAX_TIME_MULTIPLIER: float = 100.0
-const _AUTO_COLOR_TRANSTION: float = 0.05;
+## Higher the value, the slower the transition will be
+const _AUTO_COLOR_TRANSTION: float = 0.5;
 const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 
 @export var sun: DirectionalLight3D
@@ -19,11 +20,12 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 @export var start_hour: int = 0
 @export var start_minute: int = 0
 @export var start_second: int = 0
+## The day schedule that will be used. This can be null.
+@export var day_scheduler: DayScheduler
 @export var default_day_config: DayConfig = DayConfig.new()
 @export var show_debug_info: bool = false
 @export_range(0.1, _MAX_TIME_MULTIPLIER) var default_time_speed_multiplier: float = 1.0
 
-#static var _instance: Node = null
 
 @onready var _on_day_change: Subject = Subject.new()
 @onready var _on_year_change: Subject = Subject.new()
@@ -38,6 +40,9 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 @onready var _on_day_period_overwrite: Subject = Subject.new()
 @onready var _on_weather_start: Subject = Subject.new()
 @onready var _on_weather_end: Subject = Subject.new()
+@onready var _on_day_config_change: Subject = Subject.new()
+@onready var _on_day_scheduler_change: Subject = Subject.new()
+@onready var _on_day_scheduler_finish: Subject = Subject.new()
 @onready var on_day_change: Observable = _on_day_change.as_observable()
 @onready var on_year_change: Observable = _on_year_change.as_observable()
 @onready var on_night_time_start: Observable = _on_night_time_start.as_observable()
@@ -51,12 +56,16 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 @onready var on_day_period_overwrite: Observable = _on_day_period_overwrite.as_observable()
 @onready var on_weather_start: Observable = _on_weather_start.as_observable()
 @onready var on_weather_end: Observable = _on_weather_end.as_observable()
+@onready var on_day_config_change: Observable = _on_day_config_change.as_observable()
+@onready var on_day_scheduler_change: Observable = _on_day_scheduler_change.as_observable()
+@onready var on_day_scheduler_finish: Observable = _on_day_scheduler_finish.as_observable()
 
 var _percentage_through_day: float = 0
 var _time_speed_multiplier: float = 1
 var _time_to_stop_multiplier: GameTime = null
 var _time_stopped: bool = false
 var _current_date_at_start_of_day: GameTime
+var _current_date_at_end_of_day: GameTime
 var _sunrise_start_percentage: float
 var _sunset_start_percentage: float
 var _reminders: Dictionary = {}
@@ -73,6 +82,12 @@ var _day_config: DayConfig = null
 var _sunrise_today: GameTime
 var _sunset_today: GameTime
 var _middle_of_day_time: GameTime
+var _sunset_yesterday: GameTime
+var _sunrise_tomorrow: GameTime
+var _middle_of_night_begin: GameTime
+var _middle_of_night_end: GameTime
+
+var _yesterday: DayConfig
 
 var _is_day: bool = false
 
@@ -97,7 +112,10 @@ func _ready() -> void:
 #	const YEAR_DIVISOR: int = 31_536_000_000
 	GameTime.YEAR_DIVISOR = GameTime.DAYS_IN_YEAR * GameTime.DAY_DIVISOR
 
-	set_day_config(default_day_config)
+	if day_scheduler == null:
+		set_day_config(default_day_config)
+	else:
+		set_day_config(day_scheduler.get_current_day_config())
 	set_time(GameTime.create_from_time(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0)), false)
 	#print(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS).get_time_as_string())
 	var o = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS), true)
@@ -125,7 +143,7 @@ func _ready() -> void:
 #	on_day_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("day time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 #	on_night_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("night time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 	print("setting time this frame to: " + _game_time_this_frame.get_date_as_string() + " - " + _game_time_this_frame.get_time_as_string())
-	alter_time_speed(40, _game_time_this_frame.add_unit(1,TimeUnit.DAY))
+	alter_time_speed(80, _game_time_this_frame.add_unit(20,TimeUnit.DAY))
 	# sort day periods
 	if (_day_config != null) && (_day_config.day_periods != null):
 		_has_day_periods = true
@@ -161,6 +179,9 @@ func _handle_time_speed():
 		alter_time_speed(default_time_speed_multiplier)
 
 func _update_day_state(should_trigger_events: bool = true):
+	if _game_time_this_frame != null && _game_time_this_frame.get_hour() == 5 && _sunrise_today != null && _sunrise_today.get_hour() == 5:
+		var f =""
+	# TODO something wrong with is day
 	if (_percentage_through_day < _sunset_start_percentage) && (_percentage_through_day > _sunrise_start_percentage):
 		if not _is_day:
 			# Just turned day
@@ -211,15 +232,34 @@ func _update_day_state(should_trigger_events: bool = true):
 			_color_lerp_time = 0
 
 func handle_day_end():
+	_yesterday = _day_config
 	var old_date = GameTime.new(_current_date_at_start_of_day.get_epoch())
 	_current_date_at_start_of_day = _current_date_at_start_of_day.add_unit(1, TimeUnit.DAY)
+	_current_date_at_end_of_day = _current_date_at_start_of_day.set_time(Instant.new(
+		_current_date_at_start_of_day.get_year(),
+		_current_date_at_start_of_day.get_day(),
+		23,
+		59,
+		59,
+		999
+	))
 	_on_day_change.on_next(_current_date_at_start_of_day)
 	_day_period_index = 0
 	if not _current_date_at_start_of_day.is_same(old_date, TimeUnit.YEARS):
 		_on_year_change.on_next(_current_date_at_start_of_day)
-	# TODO: advance day config here?
+	if(day_scheduler != null):
+		set_day_config(day_scheduler.advance_and_get_next_day_config())
+		if day_scheduler.is_done():
+			_on_day_scheduler_finish.on_next(day_scheduler)
+			day_scheduler = null
+	else:
+		if _day_config.get_instance_id() != default_day_config.get_instance_id():
+			set_day_config(default_day_config)
 
 	_percentage_through_day -= _FULL_DAY_PERCENTAGE
+	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunrise()))
+	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunset()))
+
 	_game_time_this_frame = calculate_game_time_for_frame()
 	_calculate_milestone_times()
 	if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
@@ -237,13 +277,56 @@ func start_time() -> void:
 	_time_stopped = false
 
 func set_day_config(config: DayConfig) -> void:
+	if (_day_config != null) && (config.get_instance_id() == _day_config.get_instance_id()):
+		return
+	_color_lerp_time = 0
 	_day_config = config
+	_on_day_config_change.on_next(_day_config)
+
+func set_new_scheduler(scheduler: DayScheduler, overwrite_day_config: bool = false) -> void:
+	day_scheduler = scheduler
+	_on_day_scheduler_change.on_next(day_scheduler)
+	if overwrite_day_config:
+		set_day_config(day_scheduler.get_current_day_config())
 
 func _calculate_milestone_times() -> void:
+	if day_scheduler != null:
+		var yesterday_sunset: GameTime
+		if _yesterday != null:
+			yesterday_sunset = _yesterday.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+		else:
+			if day_scheduler.should_repeat:
+				yesterday_sunset = day_scheduler.get_previous_day_config().get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+			else:
+				# We default to the default day config is the scheduler does not repeat
+				yesterday_sunset = default_day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+		var tomorrow_sunrise: GameTime
+		if day_scheduler.is_done():
+			# We default to the default day config if the scheduler is done
+			tomorrow_sunrise = default_day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
+		else:
+			tomorrow_sunrise = day_scheduler.get_next_day_config().get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
+		_sunset_yesterday = yesterday_sunset
+		_sunrise_tomorrow = tomorrow_sunrise
+		_sunrise_today = day_scheduler.get_current_day_config().get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
+		_sunset_today = day_scheduler.get_current_day_config().get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
+		_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
+		_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
+		_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
+		return
+	# We need to calculate based off of the set day config
+	var yesterday_sunset: GameTime
+	if _yesterday != null:
+		yesterday_sunset = _yesterday.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+	else:
+		yesterday_sunset = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+	_sunset_yesterday = yesterday_sunset
+	_sunrise_tomorrow = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
 	_sunrise_today = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
 	_sunset_today = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
 	_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
-
+	_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
+	_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
 
 func set_time(time: GameTime, should_trigger_events: bool = true) -> void:
 	if should_trigger_events:
@@ -256,6 +339,14 @@ func set_time(time: GameTime, should_trigger_events: bool = true) -> void:
 		0,
 		0,
 		0
+	))
+	_current_date_at_end_of_day = time.set_time(Instant.new(
+		time.get_year(),
+		time.get_day(),
+		23,
+		59,
+		59,
+		999
 	))
 
 	_percentage_through_day = _calculate_percent_of_day_by_time(time)
@@ -276,7 +367,10 @@ func set_time(time: GameTime, should_trigger_events: bool = true) -> void:
 
 func _calculate_percent_of_day_by_time(time: GameTime) -> float:
 	var milliseconds_passed: int = time.get_epoch() - _current_date_at_start_of_day.get_epoch()
-	return float(milliseconds_passed) / float(GameTime.MILLISECONDS_IN_DAY)
+	var percentage: float = float(milliseconds_passed) / float(GameTime.MILLISECONDS_IN_DAY)
+	while percentage < 0:
+		percentage = 1 + percentage
+	return percentage
 
 func calculate_game_time_for_frame() -> GameTime:
 	var milliseconds_so_far: int = _percentage_through_day * GameTime.MILLISECONDS_IN_DAY
@@ -324,41 +418,23 @@ func calculate_light_intesity() -> float:
 
 func _get_light_intensity_percentage() -> float:
 	if _is_day:
-#		var sunrise_today: GameTime = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
-#		var sunset_today: GameTime = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
-#		var middle_of_day_time: GameTime = GameTime.new((sunrise_today.get_epoch() + sunset_today.get_epoch()) / 2)
 		if _game_time_this_frame.is_before(_middle_of_day_time):
 			return GameTime.percent_between(_game_time_this_frame, _sunrise_today, _middle_of_day_time)
 		else:
 			return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_day_time, _sunset_today)
 	else:
-		var is_first_day: bool = (_game_time_this_frame.get_year() == 0) && (_game_time_this_frame.get_day() == 0)
-		if is_first_day:
-			var sunrise_time: GameTime = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
-			var sunset_today: GameTime = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
-			if _game_time_this_frame.add_unit(1, TimeUnit.DAY).is_before(sunrise_time):
-				# TODO: This will need to change when we have different days
-				sunrise_time = sunrise_time.subtract_unit(1, TimeUnit.DAY)
-				sunset_today = sunset_today.subtract_unit(1, TimeUnit.DAY)
-			var middle_of_night_time: GameTime = GameTime.new((sunrise_time.add_unit(1,TimeUnit.DAY).get_epoch() + sunset_today.get_epoch()) / 2)
-
-			if _game_time_this_frame.add_unit(1, TimeUnit.DAY).is_before(middle_of_night_time):
-				return GameTime.percent_between(_game_time_this_frame.add_unit(1, TimeUnit.DAY), sunset_today, middle_of_night_time)
+		if _game_time_this_frame.is_before(_sunrise_today):
+			# We transitioned to night after midnight, se we should use yesterdays values
+			if _game_time_this_frame.is_before(_middle_of_night_begin):
+				return GameTime.percent_between(_game_time_this_frame, _sunset_yesterday, _middle_of_night_begin, "am,bm")
 			else:
-				return GameTime.inverted_percent_between(_game_time_this_frame.add_unit(1, TimeUnit.DAY), middle_of_night_time, sunrise_time.add_unit(1,TimeUnit.DAY))
-		# Not the first day
-		var sunrise_time: GameTime = _sunrise_today
-		var sunset_today: GameTime = _sunset_today
-		if _game_time_this_frame.is_before(sunrise_time):
-			# TODO: This will need to change when we have different days
-			sunrise_time = sunrise_time.subtract_unit(1, TimeUnit.DAY)
-			sunset_today = sunset_today.subtract_unit(1, TimeUnit.DAY)
-		var middle_of_night_time: GameTime = GameTime.new((sunrise_time.add_unit(1,TimeUnit.DAY).get_epoch() + sunset_today.get_epoch()) / 2)
-
-		if _game_time_this_frame.is_before(middle_of_night_time):
-			return GameTime.percent_between(_game_time_this_frame, sunset_today, middle_of_night_time)
+				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_begin, _sunset_today, "am,am")
 		else:
-			return GameTime.inverted_percent_between(_game_time_this_frame, middle_of_night_time, sunrise_time.add_unit(1,TimeUnit.DAY))
+			# We are night before midnight, so we should use todays values
+			if _game_time_this_frame.is_before(_middle_of_night_end):
+				return GameTime.percent_between(_game_time_this_frame, _sunset_today, _middle_of_night_end, str(_day_config.get_sunrise_time().get_hour())+"-"+str(_game_time_this_frame.get_hour()) + "-" + str(_is_day))
+			else:
+				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_end, _sunrise_tomorrow, "bm,am")
 
 func get_sun_rotation() -> Vector3:
 	var angle: float

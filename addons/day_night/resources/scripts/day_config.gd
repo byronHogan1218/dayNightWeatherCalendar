@@ -11,6 +11,8 @@ class_name DayConfig
 @export_color_no_alpha() var night_color: Color
 @export() var night_time_light_intensity: float
 @export() var minimum_light_intensity: float
+## How likely this day config is to be picked from the possible day configs in a scheduler. Higher value = more likely
+@export_range(1,1000,1) var day_weight: int = 1
 
 @export_group("Sunrise Time")
 ## Clamped between 0-23

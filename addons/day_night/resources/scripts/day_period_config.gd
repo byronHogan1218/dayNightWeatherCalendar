@@ -93,10 +93,10 @@ func _pick_weighted_element(weather_configs: Array[WeatherConfig])-> WeatherConf
 
 	var current_weight: int = 0
 
-	for weather_config in range(weather_configs.size()):
-		current_weight += weather_configs[weather_config].weather_weight
+	for weather_config_index in range(weather_configs.size()):
+		current_weight += weather_configs[weather_config_index].weather_weight
 		if random_value <= current_weight:
-			return weather_configs[weather_config]
+			return weather_configs[weather_config_index]
 
 	# If random_value exceeds all weights (unlikely), return the last element
 	return weather_configs[weather_configs.size() - 1]

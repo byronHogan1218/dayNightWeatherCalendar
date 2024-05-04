@@ -1,8 +1,9 @@
-[gd_scene load_steps=7 format=3 uid="uid://1rwjebm5rolk"]
+[gd_scene load_steps=8 format=3 uid="uid://1rwjebm5rolk"]
 
 [ext_resource type="Script" path="res://addons/day_night/day_night_cycle.gd" id="1_fe7bq"]
 [ext_resource type="Script" path="res://addons/day_night/example/3d_world/scripts/3d_world.gd" id="1_nxd1w"]
 [ext_resource type="Resource" uid="uid://box57qhyqsg2p" path="res://addons/day_night/resources/normal.tres" id="2_kh4i3"]
+[ext_resource type="Resource" uid="uid://6hl8mckxeagt" path="res://addons/day_night/resources/scheduler.tres" id="3_xcuvk"]
 [ext_resource type="PackedScene" uid="uid://gfv43oe5s608" path="res://addons/day_night/example/3d_world/weather.tscn" id="4_0b4wp"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_7kbuq"]
@@ -27,9 +28,10 @@ mesh = SubResource("SphereMesh_kmr42")
 [node name="DayNightCycle" type="Node" parent="." node_paths=PackedStringArray("sun")]
 script = ExtResource("1_fe7bq")
 sun = NodePath("../Sun")
-day_lenth_in_seconds = 50
-days_in_year = 3
+day_lenth_in_seconds = 30
+days_in_year = 4
 start_hour = 3
+day_scheduler = ExtResource("3_xcuvk")
 default_day_config = ExtResource("2_kh4i3")
 
 [node name="Camera3D" type="Camera3D" parent="."]

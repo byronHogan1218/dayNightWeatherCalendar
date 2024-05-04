@@ -11,6 +11,8 @@ const HOURS_IN_DAY: int = 24
 const MINUTES_IN_HOUR: int = 60
 const SECONDS_IN_MINUTE: int = 60
 const MILLISECONDS_IN_SECOND: int = 1000
+const _MIN_INT: int = -9223372036854775807
+const _MAX_INT: int = 9223372036854775807
 static var DAYS_IN_YEAR: int = -1
 static var YEAR_DIVISOR: int = -1
 
@@ -21,9 +23,10 @@ var _minute: int
 var _second: int
 var _millisecond: int
 
+
 func _init(epoch:int):
 	self._epoch = epoch
-	var working_epoch: int = epoch
+	var working_epoch: int = epoch if epoch >= 0 else epoch * -1
 	self._year = working_epoch / YEAR_DIVISOR
 	working_epoch -= self._year * YEAR_DIVISOR
 	self._day = (working_epoch / DAY_DIVISOR)
@@ -41,28 +44,28 @@ func add_unit(amount: int, unit: String) -> GameTime:
 		push_error("Cannot add invalid amount: " + str(amount))
 		return null
 	if (unit == TimeUnit.YEARS) or (unit == TimeUnit.YEAR):
-		return GameTime.new(self.get_epoch() + (amount * YEAR_DIVISOR))
+		return GameTime.new(min(self.get_epoch() + (amount * YEAR_DIVISOR), _MAX_INT))
 	if (unit == TimeUnit.DAYS) or (unit == TimeUnit.DAY):
 		var number_of_years_to_add: int = floor(amount / GameTime.DAYS_IN_YEAR)
 		var number_of_days_to_add: int = amount % GameTime.DAYS_IN_YEAR
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_years_to_add > 0:
 			new_date = new_date.add_unit(number_of_years_to_add, TimeUnit.YEARS)
-		return GameTime.new(new_date.get_epoch() + (number_of_days_to_add * DAY_DIVISOR))
+		return GameTime.new(min(new_date.get_epoch() + (number_of_days_to_add * DAY_DIVISOR), _MAX_INT))
 	if (unit == TimeUnit.HOURS) or (unit == TimeUnit.HOUR):
 		var number_of_days_to_add: int = floor(amount / GameTime.HOURS_IN_DAY)
 		var number_of_hours_to_add: int = amount % GameTime.HOURS_IN_DAY
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_days_to_add > 0:
 			new_date = new_date.add_unit(number_of_days_to_add, TimeUnit.DAYS)
-		return GameTime.new(new_date.get_epoch() + (number_of_hours_to_add * HOUR_DIVISOR))
+		return GameTime.new(min(new_date.get_epoch() + (number_of_hours_to_add * HOUR_DIVISOR), _MAX_INT))
 	if (unit == TimeUnit.MINUTES) or (unit == TimeUnit.MINUTE):
 		var number_of_hours_to_add: int = floor(amount / GameTime.MINUTES_IN_HOUR)
 		var number_of_minutes_to_add: int = amount % GameTime.MINUTES_IN_HOUR
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_hours_to_add > 0:
 			new_date = new_date.add_unit(number_of_hours_to_add, TimeUnit.HOURS)
-		return GameTime.new(new_date.get_epoch() + (number_of_minutes_to_add * MINUTE_DIVISOR))
+		return GameTime.new(min(new_date.get_epoch() + (number_of_minutes_to_add * MINUTE_DIVISOR), _MAX_INT))
 	if (unit == TimeUnit.SECONDS) or (unit == TimeUnit.SECOND):
 		var number_of_minutes_to_add: int = floor(amount / GameTime.SECONDS_IN_MINUTE)
 		var number_of_seconds_to_add: int = amount % GameTime.SECONDS_IN_MINUTE
@@ -76,7 +79,7 @@ func add_unit(amount: int, unit: String) -> GameTime:
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_seconds_to_add > 0:
 			new_date = new_date.add_unit(number_of_seconds_to_add, TimeUnit.SECONDS)
-		return GameTime.new(new_date.get_epoch() + (number_of_milliseconds_to_add))
+		return GameTime.new(min(new_date.get_epoch() + (number_of_milliseconds_to_add), _MAX_INT))
 	push_error("Invalid unit: " + unit)
 	return null
 
@@ -85,44 +88,47 @@ func subtract_unit(amount: int, unit: String) -> GameTime:
 		push_error("Cannot add invalid amount: " + str(amount))
 		return null
 	if (unit == TimeUnit.YEARS) or (unit == TimeUnit.YEAR):
-		return GameTime.new(clampi(self.get_epoch() - (amount * YEAR_DIVISOR),0, self.get_epoch()))
+		return GameTime.new(max(self.get_epoch() - (amount * YEAR_DIVISOR),_MIN_INT))
 	if (unit == TimeUnit.DAYS) or (unit == TimeUnit.DAY):
 		var number_of_years_to_subtract: int = floor(amount / GameTime.DAYS_IN_YEAR)
 		var number_of_days_to_subtract: int = amount % GameTime.DAYS_IN_YEAR
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_years_to_subtract > 0:
 			new_date = new_date.subtract_unit(number_of_years_to_subtract, TimeUnit.YEARS)
-		return GameTime.new(clampi(new_date.get_epoch() - (number_of_days_to_subtract * DAY_DIVISOR),0, new_date.get_epoch()))
+		return GameTime.new(max(new_date.get_epoch() - (number_of_days_to_subtract * DAY_DIVISOR),_MIN_INT))
 	if (unit == TimeUnit.HOURS) or (unit == TimeUnit.HOUR):
 		var number_of_days_to_subtract: int = floor(amount / GameTime.HOURS_IN_DAY)
 		var number_of_hours_to_subtract: int = amount % GameTime.HOURS_IN_DAY
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_days_to_subtract > 0:
 			new_date = new_date.subtract_unit(number_of_days_to_subtract, TimeUnit.DAYS)
-		return GameTime.new(clampi(new_date.get_epoch() - (number_of_hours_to_subtract * HOUR_DIVISOR),0, new_date.get_epoch()))
+		return GameTime.new(max(new_date.get_epoch() - (number_of_hours_to_subtract * HOUR_DIVISOR),_MIN_INT))
 	if (unit == TimeUnit.MINUTES) or (unit == TimeUnit.MINUTE):
 		var number_of_hours_to_subtract: int = floor(amount / GameTime.MINUTES_IN_HOUR)
 		var number_of_minutes_to_subtract: int = amount % GameTime.MINUTES_IN_HOUR
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_hours_to_subtract > 0:
 			new_date = new_date.subtract_unit(number_of_hours_to_subtract, TimeUnit.HOURS)
-		return GameTime.new(clampi(new_date.get_epoch() - (number_of_minutes_to_subtract * MINUTE_DIVISOR),0, new_date.get_epoch()))
+		return GameTime.new(max(new_date.get_epoch() - (number_of_minutes_to_subtract * MINUTE_DIVISOR),_MIN_INT))
 	if (unit == TimeUnit.SECONDS) or (unit == TimeUnit.SECOND):
 		var number_of_minutes_to_subtract: int = floor(amount / GameTime.SECONDS_IN_MINUTE)
 		var number_of_seconds_to_subtract: int = amount % GameTime.SECONDS_IN_MINUTE
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_minutes_to_subtract > 0:
 			new_date = new_date.subtract_unit(number_of_minutes_to_subtract, TimeUnit.MINUTES)
-		return GameTime.new(clampi(new_date.get_epoch() - (number_of_seconds_to_subtract * SECOND_DIVISOR),0, new_date.get_epoch()))
+		return GameTime.new(max(new_date.get_epoch() - (number_of_seconds_to_subtract * SECOND_DIVISOR),_MIN_INT))
 	if (unit == TimeUnit.MILLISECONDS) or (unit == TimeUnit.MILLISECOND):
 		var number_of_seconds_to_subtract: int = floor(amount / GameTime.MILLISECONDS_IN_SECOND)
 		var number_of_milliseconds_to_subtract: int = amount % GameTime.MILLISECONDS_IN_SECOND
 		var new_date: GameTime = GameTime.new(self.get_epoch())
 		if number_of_seconds_to_subtract > 0:
 			new_date = new_date.subtract_unit(number_of_seconds_to_subtract, TimeUnit.SECONDS)
-		return GameTime.new(clampi(new_date.get_epoch() - (number_of_milliseconds_to_subtract),0, new_date.get_epoch()))
+		return GameTime.new(max(new_date.get_epoch() - (number_of_milliseconds_to_subtract),_MIN_INT))
 	push_error("Invalid unit: " + unit)
 	return null
+
+func is_negative() -> bool:
+	return get_epoch() < 0
 
 func set_unit(amount: int, unit: String, should_clamp: bool = false) -> GameTime:
 	if amount < 0:
@@ -158,11 +164,11 @@ func set_unit(amount: int, unit: String, should_clamp: bool = false) -> GameTime
 	push_error("Invalid unit: " + unit)
 	return null
 
-
-
 func is_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
 	if other_time == null:
 		push_error("Cannot compare to null time")
+		return false
+	if is_negative() != other_time.is_negative():
 		return false
 	if (unit == TimeUnit.YEARS) or (unit == TimeUnit.YEAR):
 		return self.get_year() == other_time.get_year()
@@ -186,6 +192,12 @@ func is_after(other_time: GameTime) -> bool:
 	if other_time == null:
 		push_error("Cannot compare to null time")
 		return false
+	if is_negative() && !other_time.is_negative():
+		return false
+	if !is_negative() && other_time.is_negative():
+		return true
+	if is_negative() && other_time.is_negative():
+		return self.get_epoch() < other_time.get_epoch()
 	return self.get_epoch() > other_time.get_epoch()
 
 func is_after_or_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
@@ -198,6 +210,12 @@ func is_before(other_time: GameTime) -> bool:
 	if other_time == null:
 		push_error("Cannot compare to null time")
 		return false
+	if is_negative() && !other_time.is_negative():
+		return true
+	if !is_negative() && other_time.is_negative():
+		return false
+	if is_negative() && other_time.is_negative():
+		return self.get_epoch() > other_time.get_epoch()
 	return self.get_epoch() < other_time.get_epoch()
 
 func is_before_or_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
@@ -232,13 +250,15 @@ func get_day() -> int:
 	return _day
 
 func to_instant() -> Instant:
-	return Instant.new(self.get_year(), self.get_day(), self.get_hour(), self.get_minute(), self.get_second(), self.get_millisecond())
+	return Instant.new(self.get_year(), self.get_day(), self.get_hour(), self.get_minute(), self.get_second(), self.get_millisecond(), self.is_negative())
 
 func get_time_as_string() -> String:
 	return str(get_hour()) + ":" + str(get_minute()) + ":" + str(get_second()) + ":" + str(get_millisecond())
 
 func get_date_as_string() -> String:
-	return str(get_year()) + "-" + str(get_day())
+	var year: int = get_year() if not is_negative() else get_year() * -1
+	var day: int = get_day() if not is_negative() else get_day() * -1
+	return str(year) + "-" + str(day)
 
 func get_date_time_as_string() -> String:
 	return get_date_as_string() + " - " + get_time_as_string()
@@ -276,7 +296,8 @@ static func random_time_in_range(start: GameTime, end: GameTime) -> GameTime:
 	return GameTime.new(start.get_epoch() + random)
 
 static func create_from_time(time: Instant) -> GameTime:
-	return GameTime.new(time.get_year() * YEAR_DIVISOR + time.get_day() * DAY_DIVISOR + time.get_hour() * HOUR_DIVISOR + time.get_minute() * MINUTE_DIVISOR + time.get_second() * SECOND_DIVISOR + time.get_millisecond())
+	return GameTime.new(time.get_epoch())
+#	return GameTime.new(time.get_year() * YEAR_DIVISOR + time.get_day() * DAY_DIVISOR + time.get_hour() * HOUR_DIVISOR + time.get_minute() * MINUTE_DIVISOR + time.get_second() * SECOND_DIVISOR + time.get_millisecond())
 
 static func lerp_time(time1: GameTime, time2: GameTime, weight: float) -> GameTime:
 	return GameTime.new(GameTime.lerp(time1, time2, weight))
@@ -286,9 +307,9 @@ static func lerp(time1: GameTime, time2: GameTime, weight: float) -> float:
 	var b_epoch: int = time2.get_epoch()
 	return lerp(a_epoch, b_epoch, weight)
 
-static func percent_between(current_time: GameTime, start_time: GameTime, end_time: GameTime) -> float:
+static func percent_between(current_time: GameTime, start_time: GameTime, end_time: GameTime, name: String = "") -> float:
 	if not GameTime.is_in_range(current_time, start_time, end_time):
-		push_error("Cannot get percentage of time outside of range. Current " + current_time.get_date_time_as_string() + " - A: " + start_time.get_date_time_as_string() + " - B: " + end_time.get_date_time_as_string())
+		push_error(name + "...Cannot get percentage of time outside of range. Current " + current_time.get_date_time_as_string() + " - A: " + start_time.get_date_time_as_string() + " - B: " + end_time.get_date_time_as_string())
 		return 0
 	var current: int = current_time.get_epoch()
 	var start: int = start_time.get_epoch()
@@ -299,7 +320,7 @@ static func percent_between(current_time: GameTime, start_time: GameTime, end_ti
 
 	return clampf(float(current - start) / float(percent_range),0,1)
 
-static func inverted_percent_between(current_time: GameTime, start_time: GameTime, end_time: GameTime) -> float:
-	var percent: float = percent_between(current_time, start_time, end_time)
+static func inverted_percent_between(current_time: GameTime, start_time: GameTime, end_time: GameTime, name: String = "") -> float:
+	var percent: float = percent_between(current_time, start_time, end_time, name)
 	return 1.0 - percent
 
