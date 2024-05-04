@@ -10,5 +10,5 @@ script = ExtResource("1_mi8ym")
 scheduler_name = ""
 should_repeat = true
 buffer_size = 1
-selection_type = "Weighted Random Pick"
+selection_type = "In Order"
 day_configs = Array[Resource("res://addons/day_night/resources/scripts/day_config.gd")]([ExtResource("1_3jkbv"), ExtResource("2_i1k1o"), ExtResource("3_ig262")])

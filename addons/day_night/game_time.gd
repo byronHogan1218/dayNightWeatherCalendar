@@ -2,18 +2,29 @@ class_name GameTime
 
 var _epoch:int # in milliseconds
 
-const MILLISECONDS_IN_DAY: int = 86400000
+## Equivalent to 86_400_000
+const MILLISECONDS_IN_DAY: int = 86_400_000
+## Equivalent to 86_400_000
 const DAY_DIVISOR: int = 86_400_000
+## Equivalent to 3_600_000
 const HOUR_DIVISOR: int = 3_600_000
+## Equivalent to 60_000
 const MINUTE_DIVISOR: int = 60_000
+## Equivalent to 1000
 const SECOND_DIVISOR: int = 1000
+## Equivalent to 24
 const HOURS_IN_DAY: int = 24
+## Equivalent to 60
 const MINUTES_IN_HOUR: int = 60
+## Equivalent to 60
 const SECONDS_IN_MINUTE: int = 60
+## Equivalent to 1000
 const MILLISECONDS_IN_SECOND: int = 1000
 const _MIN_INT: int = -9223372036854775807
 const _MAX_INT: int = 9223372036854775807
+## Set by the day_night script. Represents the number of days in a year
 static var DAYS_IN_YEAR: int = -1
+## Set by the day_night script, this is calculated from DAYS_IN_YEAR * DAY_DIVISOR
 static var YEAR_DIVISOR: int = -1
 
 var _year: int
