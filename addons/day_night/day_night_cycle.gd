@@ -5,7 +5,8 @@ const _FULL_DAY_PERCENTAGE: int = 1
 const _MAX_DAY_LENGTH: int = 8640000 # 100 * an earth day length in seconds
 const _MAX_TIME_MULTIPLIER: float = 100.0
 ## Higher the value, the slower the transition will be
-const _AUTO_COLOR_TRANSTION: float = 15;
+# TODO make this configurable
+const _AUTO_COLOR_TRANSTION: float = 4
 const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 
 @export var sun: DirectionalLight3D
@@ -141,7 +142,7 @@ func _ready() -> void:
 #	on_day_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("day time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 #	on_night_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("night time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 	print("setting time this frame to: " + _game_time_this_frame.get_date_as_string() + " - " + _game_time_this_frame.get_time_as_string())
-#	alter_time_speed(40, _game_time_this_frame.add_unit(10,TimeUnit.DAY))
+	alter_time_speed(10, _game_time_this_frame.add_unit(1000,TimeUnit.DAY))
 	# NEEDED
 	if (_day_config != null) && (_day_config.day_periods != null):
 		_has_day_periods = true
@@ -408,6 +409,7 @@ func get_time_speed_multiplier() -> float:
 func get_light_color(delta: float, immediate: bool = false) -> Color:
 	if (_color_lerp_time > 1):
 		return sun.get_color();
+	# TODO if time being warped, this should go quicker. Tyry adding warp time in this calculation
 	_color_lerp_time += delta / (day_lenth_in_seconds * _AUTO_COLOR_TRANSTION)
 	var new_color: Color
 	if _active_weather != null:
@@ -457,6 +459,7 @@ func get_sun_rotation() -> Vector3:
 		else:
 			# TODO this will need to be a "get tomorrow" functionality instead of same day config when different days are possible
 			# Still night but after the 24th hour
+			# TODO try this with the milestones calculated
 			var current: float = _percentage_through_day + float(_FULL_DAY_PERCENTAGE) - _sunset_start_percentage
 			var total: float = float(_FULL_DAY_PERCENTAGE) + _sunrise_start_percentage - _sunset_start_percentage
 			percentage = (current / total)
@@ -473,8 +476,9 @@ func load() -> Dictionary:
 	# TODO restor the state from the string or whatever that save produces
 	return {}
 
-func remove_repeating_reminder(time: GameTime) -> void:
+func remove_reminder(time: GameTime) -> void:
 	# TODO implement
+	# Make sure this handles repeating reminders
 	pass
 
 func create_reminder(time: GameTime, repeating: bool = false) -> Observable:
