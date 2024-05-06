@@ -175,7 +175,7 @@ func set_unit(amount: int, unit: String, should_clamp: bool = false) -> GameTime
 	push_error("Invalid unit: " + unit)
 	return null
 
-func is_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
+func is_same_unit(other_time: GameTime, unit: String) -> bool:
 	if other_time == null:
 		push_error("Cannot compare to null time")
 		return false
@@ -192,8 +192,29 @@ func is_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
 	if (unit == TimeUnit.SECONDS) or (unit == TimeUnit.SECOND):
 		return self.get_second() == other_time.get_second()
 	if (unit == TimeUnit.MILLISECONDS) or (unit == TimeUnit.MILLISECOND):
-		return self.get_epoch() == other_time.get_epoch()
+		return self.get_millisecond() == other_time.get_millisecond()
 	push_error("Invalid unit: " + unit)
+	return false
+
+func is_same(other_time: GameTime, granularity: String = TimeUnit.MILLISECOND) -> bool:
+	if other_time == null:
+		push_error("Cannot compare to null time")
+		return false
+	if is_negative() != other_time.is_negative():
+		return false
+	if (granularity == TimeUnit.YEARS) or (granularity == TimeUnit.YEAR):
+		return self.get_year() == other_time.get_year()
+	if (granularity == TimeUnit.DAYS) or (granularity == TimeUnit.DAY):
+		return (self.get_day() == other_time.get_day()) && (self.get_year() == other_time.get_year())
+	if (granularity == TimeUnit.HOURS) or (granularity == TimeUnit.HOUR):
+		return (self.get_hour() == other_time.get_hour()) && (self.get_day() == other_time.get_day()) && (self.get_year() == other_time.get_year())
+	if (granularity == TimeUnit.MINUTES) or (granularity == TimeUnit.MINUTE):
+		return (self.get_minute() == other_time.get_minute()) && (self.get_hour() == other_time.get_hour()) && (self.get_day() == other_time.get_day()) && (self.get_year() == other_time.get_year())
+	if (granularity == TimeUnit.SECONDS) or (granularity == TimeUnit.SECOND):
+		return (self.get_second() == other_time.get_second()) && (self.get_minute() == other_time.get_minute()) && (self.get_hour() == other_time.get_hour()) && (self.get_day() == other_time.get_day()) && (self.get_year() == other_time.get_year())
+	if (granularity == TimeUnit.MILLISECONDS) or (granularity == TimeUnit.MILLISECOND):
+		return self.get_epoch() == other_time.get_epoch()
+	push_error("Invalid unit: " + granularity)
 	return false
 
 func is_today(today: GameTime) -> bool:
@@ -211,11 +232,11 @@ func is_after(other_time: GameTime) -> bool:
 		return self.get_epoch() < other_time.get_epoch()
 	return self.get_epoch() > other_time.get_epoch()
 
-func is_after_or_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
+func is_after_or_same(other_time: GameTime, granularity: String = TimeUnit.MILLISECOND) -> bool:
 	if other_time == null:
 		push_error("Cannot compare to null time")
 		return false
-	return self.is_after(other_time) or self.is_same(other_time, unit)
+	return self.is_after(other_time) or self.is_same(other_time, granularity)
 
 func is_before(other_time: GameTime) -> bool:
 	if other_time == null:
@@ -229,11 +250,11 @@ func is_before(other_time: GameTime) -> bool:
 		return self.get_epoch() > other_time.get_epoch()
 	return self.get_epoch() < other_time.get_epoch()
 
-func is_before_or_same(other_time: GameTime, unit: String = TimeUnit.MILLISECOND) -> bool:
+func is_before_or_same(other_time: GameTime, granularity: String = TimeUnit.MILLISECOND) -> bool:
 	if other_time == null:
 		push_error("Cannot compare to null time")
 		return false
-	return self.is_before(other_time) or self.is_same(other_time, unit)
+	return self.is_before(other_time) or self.is_same(other_time, granularity)
 
 
 func set_time(time: Instant) -> GameTime:

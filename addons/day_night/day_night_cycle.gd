@@ -5,8 +5,7 @@ const _FULL_DAY_PERCENTAGE: int = 1
 const _MAX_DAY_LENGTH: int = 8640000 # 100 * an earth day length in seconds
 const _MAX_TIME_MULTIPLIER: float = 100.0
 ## Higher the value, the slower the transition will be
-# TODO make this configurable
-const _AUTO_COLOR_TRANSTION: float = 4
+const _AUTO_COLOR_TRANSTION: float = 30
 const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 
 @export var sun: DirectionalLight3D
@@ -88,6 +87,8 @@ var _sunset_yesterday: GameTime
 var _sunrise_tomorrow: GameTime
 var _middle_of_night_begin: GameTime
 var _middle_of_night_end: GameTime
+var _queued_day_config: DayConfig = null
+var _queued_scheduler: DayScheduler = null
 
 var _yesterday: DayConfig
 
@@ -115,7 +116,7 @@ func _ready() -> void:
 		set_day_config(default_day_config)
 	else:
 		set_day_config(day_scheduler.get_current_day_config())
-	set_time(GameTime.create_from_time(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0, before_year_zero)), false)
+	set_time(GameTime.create_from_time(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0, before_year_zero)))
 	#print(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS).get_time_as_string())
 	var o = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS), true)
 	var o2 = create_reminder(_current_date_at_start_of_day.add_unit(12, TimeUnit.HOURS), true)
@@ -142,7 +143,7 @@ func _ready() -> void:
 #	on_day_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("day time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 #	on_night_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("night time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 	print("setting time this frame to: " + _game_time_this_frame.get_date_as_string() + " - " + _game_time_this_frame.get_time_as_string())
-	alter_time_speed(10, _game_time_this_frame.add_unit(1000,TimeUnit.DAY))
+	alter_time_speed(10, _game_time_this_frame.add_unit(3,TimeUnit.DAY))
 	# NEEDED
 	if (_day_config != null) && (_day_config.day_periods != null):
 		_has_day_periods = true
@@ -180,34 +181,27 @@ func _handle_time_speed():
 		alter_time_speed(default_time_speed_multiplier)
 
 func queue_day_config(config: DayConfig) -> void:
-	#TODO implement
-	# set class level varibale that will be checked in handle day end
-	pass
+	_queued_day_config = config
+
 func has_queued_day_config() -> bool:
-	#TODO implement
-	# returns is class level variable is set
-	return false
+	return _queued_day_config != null
+
 func remove_queued_day_config() -> void:
 	if !has_queued_day_config():
 		return
-	#TODO implement
-	# sets class level variable to null
+	_queued_day_config = null
 	pass
 
 func queue_scheduler(scheduler: DayScheduler) -> void:
-	#TODO implement
-	# set class level varibale that will be checked in handle day end
-	pass
+	_queued_scheduler = scheduler
+
 func has_queued_scheduler() -> bool:
-	#TODO implement
-	# returns is class level variable is set
+	return _queued_scheduler != null
 	return false
 func remove_queued_scheduler() -> void:
 	if !has_queued_scheduler():
 		return
-	#TODO implement
-	# sets class level variable to null
-	pass
+	_queued_scheduler = null
 
 func get_current_scheduler() -> DayScheduler:
 	return day_scheduler
@@ -264,8 +258,13 @@ func handle_day_end():
 		if day_scheduler.is_done():
 			_on_day_scheduler_finish.on_next(day_scheduler)
 			day_scheduler = null
+			if has_queued_scheduler():
+				set_new_scheduler(_queued_scheduler)
+				remove_queued_scheduler()
 	else:
-		if _day_config.get_instance_id() != default_day_config.get_instance_id():
+		if has_queued_day_config():
+			set_day_config(_queued_day_config)
+		elif _day_config.get_instance_id() != default_day_config.get_instance_id():
 			set_day_config(default_day_config)
 
 	if (_day_config != null) && (_day_config.day_periods != null):
@@ -281,7 +280,7 @@ func handle_day_end():
 	_game_time_this_frame = _calculate_game_time_for_frame()
 	_calculate_milestone_times()
 	_on_day_change.on_next(_current_date_at_start_of_day)
-	if not _current_date_at_start_of_day.is_same(old_start_of_date, TimeUnit.YEARS):
+	if not _current_date_at_start_of_day.is_same_unit(old_start_of_date, TimeUnit.YEARS):
 		_on_year_change.on_next(_current_date_at_start_of_day)
 	if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
 		handle_day_end()
@@ -349,10 +348,7 @@ func _calculate_milestone_times() -> void:
 	_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
 	_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
 
-func set_time(time: GameTime, should_trigger_events: bool = true) -> void:
-	if should_trigger_events:
-		# TODO: trigger events for how much time has passed
-		_on_day_change.on_next(time)
+func set_time(time: GameTime) -> void:
 	_current_date_at_start_of_day = time.set_time(Instant.new(
 		time.get_year(),
 		time.get_day(),
@@ -388,7 +384,7 @@ func set_time(time: GameTime, should_trigger_events: bool = true) -> void:
 	_game_time_this_frame = _calculate_game_time_for_frame()
 	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunrise()))
 	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunset()))
-	_update_day_state(should_trigger_events)
+	_update_day_state()
 	_populate_reminders(_current_date_at_start_of_day)
 	_is_day = (_percentage_through_day >= _sunrise_start_percentage) && (_percentage_through_day < _sunset_start_percentage)
 	_calculate_milestone_times()
@@ -409,8 +405,7 @@ func get_time_speed_multiplier() -> float:
 func get_light_color(delta: float, immediate: bool = false) -> Color:
 	if (_color_lerp_time > 1):
 		return sun.get_color();
-	# TODO if time being warped, this should go quicker. Tyry adding warp time in this calculation
-	_color_lerp_time += delta / (day_lenth_in_seconds * _AUTO_COLOR_TRANSTION)
+	_color_lerp_time += (delta / (day_lenth_in_seconds * _AUTO_COLOR_TRANSTION)) * _time_speed_multiplier
 	var new_color: Color
 	if _active_weather != null:
 		new_color = _active_weather.day_time_weather_color if _is_day else _active_weather.night_time_weather_color
@@ -457,9 +452,8 @@ func get_sun_rotation() -> Vector3:
 			var total: float = ((_sunrise_start_percentage + _FULL_DAY_PERCENTAGE) - _sunset_start_percentage)
 			percentage =  current / total
 		else:
-			# TODO this will need to be a "get tomorrow" functionality instead of same day config when different days are possible
+			# NOTE: This is potential room for imporvement here if we can look at tomorrows
 			# Still night but after the 24th hour
-			# TODO try this with the milestones calculated
 			var current: float = _percentage_through_day + float(_FULL_DAY_PERCENTAGE) - _sunset_start_percentage
 			var total: float = float(_FULL_DAY_PERCENTAGE) + _sunrise_start_percentage - _sunset_start_percentage
 			percentage = (current / total)
@@ -467,6 +461,11 @@ func get_sun_rotation() -> Vector3:
 
 	# The x axis needs to be offset by 180 to get the correct angle
 	return Vector3(angle + 180, angle, 0)
+
+func is_night_before_midnight() -> bool:
+	if is_day():
+		return false
+	return _percentage_through_day >= _sunset_start_percentage
 
 func save() -> Dictionary:
 	# TODO implement. Return a string or something that when given to load will restore the state
@@ -477,8 +476,33 @@ func load() -> Dictionary:
 	return {}
 
 func remove_reminder(time: GameTime) -> void:
+	if _reminders.has(time.get_date_as_string()):
+		_reminders.erase(time.get_date_as_string())
+	if _repeating_reminders.has(time.get_date_as_string()):
+		_repeating_reminders.erase(time.get_date_as_string())
+		# If the reminder is for today and is after now, we need to add it to the list of reminders for today
+	if time.is_today(_game_time_this_frame):
+		var new_reminders: Array = []
+		for reminder in _todays_reminders:
+			if !reminder.time.is_same(time):
+				new_reminders.append(reminder)
+		_todays_reminders = new_reminders
+		_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
+		_reminder_index = 0
+		while _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
+			_reminder_index += 1
+
+func remove_current_scheduler() -> void:
 	# TODO implement
-	# Make sure this handles repeating reminders
+	pass
+func remove_current_day_config() -> void:
+	# TODO implement
+	pass
+func remove_current_day_period() -> void:
+	# TODO implement
+	pass
+func remove_current_weather() -> void:
+	# TODO implement
 	pass
 
 func create_reminder(time: GameTime, repeating: bool = false) -> Observable:
@@ -549,14 +573,13 @@ func _send_potential_reminders() -> void:
 			_todays_reminders[_reminder_index].observable.on_next(true)
 			_reminder_index += 1
 
-func _update_day_state(should_trigger_events: bool = true):
+func _update_day_state():
 	if (_percentage_through_day < _sunset_start_percentage) && (_percentage_through_day > _sunrise_start_percentage):
 		if not _is_day:
 			# Just turned day
 			_color_lerp_time = 0
 			_is_day = true
-			if should_trigger_events:
-				_on_day_time_start.on_next(GameTime.new(_game_time_this_frame.get_epoch()))
+			_on_day_time_start.on_next(GameTime.new(_game_time_this_frame.get_epoch()))
 		else:
 			var delete_me
 			#it has been day
@@ -566,8 +589,7 @@ func _update_day_state(should_trigger_events: bool = true):
 			# just turned night
 			_color_lerp_time = 0
 			_is_day = false
-			if should_trigger_events:
-				_on_night_time_start.on_next(GameTime.new(_game_time_this_frame.get_epoch()))
+			_on_night_time_start.on_next(GameTime.new(_game_time_this_frame.get_epoch()))
 		else:
 			var delete_me
 			# it has been night
