@@ -155,7 +155,6 @@ func clear_console(num):
 	for i in range(num):
 		print("")
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float):
 	if not _time_stopped:
 		_percentage_through_day += (delta / day_lenth_in_seconds) * _time_speed_multiplier;
@@ -197,7 +196,7 @@ func queue_scheduler(scheduler: DayScheduler) -> void:
 
 func has_queued_scheduler() -> bool:
 	return _queued_scheduler != null
-	return false
+
 func remove_queued_scheduler() -> void:
 	if !has_queued_scheduler():
 		return
@@ -256,14 +255,14 @@ func handle_day_end():
 	if(day_scheduler != null):
 		set_day_config(day_scheduler.advance_and_get_next_day_config())
 		if day_scheduler.is_done():
-			_on_day_scheduler_finish.on_next(day_scheduler)
-			day_scheduler = null
+			_end_current_scheduler()
 			if has_queued_scheduler():
 				set_new_scheduler(_queued_scheduler)
 				remove_queued_scheduler()
 	else:
 		if has_queued_day_config():
 			set_day_config(_queued_day_config)
+			remove_queued_day_config()
 		elif _day_config.get_instance_id() != default_day_config.get_instance_id():
 			set_day_config(default_day_config)
 
@@ -493,17 +492,25 @@ func remove_reminder(time: GameTime) -> void:
 			_reminder_index += 1
 
 func remove_current_scheduler() -> void:
-	# TODO implement
-	pass
+	if day_scheduler == null:
+		return
+	_end_current_scheduler()
+
 func remove_current_day_config() -> void:
-	# TODO implement
-	pass
+	if _day_config.get_instance_id() == default_day_config.get_instance_id():
+		return
+	_day_config = default_day_config
+	_on_day_config_change.on_next(_day_config)
+
 func remove_current_day_period() -> void:
-	# TODO implement
-	pass
+	if _active_period == null:
+		return
+	_end_active_period()
+
 func remove_current_weather() -> void:
-	# TODO implement
-	pass
+	if _active_weather == null:
+		return
+	_end_active_weather()
 
 func create_reminder(time: GameTime, repeating: bool = false) -> Observable:
 	var observable: Subject = Subject.new()
@@ -628,8 +635,7 @@ func _set_active_period(period: DayPeriodConfig) -> void:
 	_color_lerp_time = 0
 	if _active_period != null:
 		if _active_weather != null:
-			_on_weather_end.on_next(_active_weather)
-			_active_weather = null
+			_end_active_weather()
 		_on_day_period_overwrite.on_next({"old_period": _active_period, "new_period": _day_config.day_periods[_day_period_index]})
 	_active_period = period
 	if _active_period.has_weather():
@@ -637,15 +643,23 @@ func _set_active_period(period: DayPeriodConfig) -> void:
 		if (possible_weather != null) && possible_weather.should_trigger():
 			_active_weather = possible_weather
 			_on_weather_start.on_next(_active_weather)
+
+## This assumes that there is an active period
 func _end_active_period() -> void:
-	if _active_period == null:
-		return
 	if _active_weather != null:
-		_on_weather_end.on_next(_active_weather)
-		_active_weather = null
+		_end_active_weather()
 	_on_day_period_end.on_next(_active_period)
 	_active_period = null
 	_color_lerp_time = 0
+
+## This assumes that there is active weather
+func _end_active_weather() -> void:
+	_on_weather_end.on_next(_active_weather)
+	_active_weather = null
+
+func _end_current_scheduler() -> void:
+	_on_day_scheduler_finish.on_next(day_scheduler)
+	day_scheduler = null
 
 func _calculate_percent_of_day_by_time(time: GameTime) -> float:
 	var milliseconds_passed: int = time.get_epoch() - _current_date_at_start_of_day.get_epoch()
