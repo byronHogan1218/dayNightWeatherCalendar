@@ -25,15 +25,20 @@ func is_done() -> bool:
 func is_last() -> bool:
 	return (get_current_index() + 1) > day_configs.size() - 1
 
-func advance_and_get_next_day_config() -> DayConfig:
+func advance_and_get_day_config() -> DayConfig:
 	if is_done():
 		return null
-	_index = (_index + 1) 
+	advance_day_config()
+	return get_at_index(_index)
+
+func advance_day_config() -> void:
+	if is_done():
+		return
+	_index = (_index + 1)
 	if _index >= day_configs.size():
 		_create_ordered_config_indexes()
 		print(str(_ordered_config_indexes))
 		_index = 0
-	return get_at_index(_index)
 
 func get_previous_day_config() -> DayConfig:
 	if not should_repeat:

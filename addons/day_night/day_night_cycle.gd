@@ -1,5 +1,15 @@
 extends Node
+# TODO change color of ambient lighting to light color
+# TODO turn off sun at night and only have ambient lighting
+# TODO code cleanup, public on top, function docs, DRY
+# TODO make example scenes
+# TODO Write readme
+# TODO Try 2d
+# TODO Icon for day night node
+# TODO check godot making a plugin for anything missed
+# TODO publish
 
+const _VERSION: String = "1.0.0"
 const _MIN_DAY_LENGTH: int = 3
 const _FULL_DAY_PERCENTAGE: int = 1
 const _MAX_DAY_LENGTH: int = 8640000 # 100 * an earth day length in seconds
@@ -88,6 +98,7 @@ var _sunrise_tomorrow: GameTime
 var _middle_of_night_begin: GameTime
 var _middle_of_night_end: GameTime
 var _queued_day_config: DayConfig = null
+var _queued_day_config_overwrite: bool = false
 var _queued_scheduler: DayScheduler = null
 
 var _yesterday: DayConfig
@@ -96,6 +107,7 @@ var _is_day: bool = false
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	# TODO cleanup ready func
 	if show_debug_info:
 		on_day_period_overwrite.subscribe(func(information: Dictionary): print("Day Period Overwriten. Old period: " + information.get("old_period").period_name + " - New period: " + information.get("new_period").period_name)).dispose_with(self)
 	if default_day_config == null:
@@ -118,9 +130,9 @@ func _ready() -> void:
 		set_day_config(day_scheduler.get_current_day_config())
 	set_time(GameTime.create_from_time(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0, before_year_zero)))
 	#print(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS).get_time_as_string())
-	var o = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS), true)
-	var o2 = create_reminder(_current_date_at_start_of_day.add_unit(12, TimeUnit.HOURS), true)
-	var o3 = create_reminder(_current_date_at_start_of_day.add_unit(14, TimeUnit.HOURS), true)
+	var o = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS),"1", true)
+	var o2 = create_reminder(_current_date_at_start_of_day.add_unit(12, TimeUnit.HOURS),"noon", true)
+	var o3 = create_reminder(_current_date_at_start_of_day.add_unit(14, TimeUnit.HOURS),"2", true)
 
 	on_day_change \
 		.subscribe(func(newTime: GameTime): _populate_reminders(newTime)).dispose_with(self)
@@ -179,7 +191,8 @@ func _handle_time_speed():
 		_on_time_speed_end.on_next(_game_time_this_frame)
 		alter_time_speed(default_time_speed_multiplier)
 
-func queue_day_config(config: DayConfig) -> void:
+func queue_day_config(config: DayConfig, overwrite_day: bool = false) -> void:
+	_queued_day_config_overwrite = overwrite_day
 	_queued_day_config = config
 
 func has_queued_day_config() -> bool:
@@ -253,7 +266,13 @@ func handle_day_end():
 	))
 	_day_period_index = 0
 	if(day_scheduler != null):
-		set_day_config(day_scheduler.advance_and_get_next_day_config())
+		if has_queued_day_config():
+			set_day_config(_queued_day_config)
+			remove_queued_day_config()
+			if _queued_day_config_overwrite && !day_scheduler.is_done():
+				day_scheduler.advance_day_config()
+		else:
+			set_day_config(day_scheduler.advance_and_get_day_config())
 		if day_scheduler.is_done():
 			_end_current_scheduler()
 			if has_queued_scheduler():
@@ -266,6 +285,7 @@ func handle_day_end():
 		elif _day_config.get_instance_id() != default_day_config.get_instance_id():
 			set_day_config(default_day_config)
 
+	_queued_day_config_overwrite = false
 	if (_day_config != null) && (_day_config.day_periods != null):
 		_has_day_periods = true
 		_day_config.day_periods.sort_custom(func(a, b): return a.start_time < b.start_time)
@@ -365,7 +385,7 @@ func set_time(time: GameTime) -> void:
 		999
 	))
 	if day_scheduler != null:
-		set_day_config(day_scheduler.advance_and_get_next_day_config())
+		set_day_config(day_scheduler.advance_and_get_day_config())
 		if day_scheduler.is_done():
 			_on_day_scheduler_finish.on_next(day_scheduler)
 			day_scheduler = null
@@ -451,7 +471,7 @@ func get_sun_rotation() -> Vector3:
 			var total: float = ((_sunrise_start_percentage + _FULL_DAY_PERCENTAGE) - _sunset_start_percentage)
 			percentage =  current / total
 		else:
-			# NOTE: This is potential room for imporvement here if we can look at tomorrows
+			# NOTE: This is potential room for improvement here if we can look at tomorrows
 			# Still night but after the 24th hour
 			var current: float = _percentage_through_day + float(_FULL_DAY_PERCENTAGE) - _sunset_start_percentage
 			var total: float = float(_FULL_DAY_PERCENTAGE) + _sunrise_start_percentage - _sunset_start_percentage
@@ -466,30 +486,69 @@ func is_night_before_midnight() -> bool:
 		return false
 	return _percentage_through_day >= _sunset_start_percentage
 
-func save() -> Dictionary:
+func save_reminders() -> Dictionary:
+	var reminders: Array[Variant] = []
+	for reminder in _reminders.values():
+		if reminder.time.is_after_or_same(_game_time_this_frame, TimeUnit.DAYS):
+			reminders.append({"time":reminder.time.get_epoch(), "name":reminder.name})
+	var repeating_reminders: Array[Variant] = []
+	for reminder in _repeating_reminders.values():
+		if reminder.time.is_after_or_same(_game_time_this_frame, TimeUnit.DAYS):
+			repeating_reminders.append({"time":reminder.time.get_epoch(), "name":reminder.name})
+
+	return {
+		"reminders": reminders,
+		"repeating_reminders": repeating_reminders,
+	}
+
+func save() -> String:
+	# TODO review for everything that needs to be saved
+	var save_object: Dictionary = {
+		"version": _VERSION,
+		"current_time": _game_time_this_frame.get_epoch(),
+		"time_speed_multiplier": _time_speed_multiplier,
+		"time_to_stop_multiplier": _time_to_stop_multiplier.get_epoch(),
+		"color_lerp_time": _color_lerp_time,
+		"time_stopped": _time_stopped,
+		"day_config": _day_config, # TODO make save method for DayConfig
+		"queued_day_config": _queued_day_config, # TODO make save method for DayConfig
+		"scheduler": day_scheduler, # TODO make save method for Scheduler
+		"queued_scheduler": _queued_scheduler, # TODO make save method for Scheduler
+		"queued_day_config_overwrite": _queued_day_config_overwrite,
+		"active_period": _active_period, # TODO make save method for DayPeriodConfig
+		"active_weather": _active_weather, # TODO make save method for WeatherConfig
+		"day_period_index": _day_period_index, # TODO might not need
+	}
 	# TODO implement. Return a string or something that when given to load will restore the state
-	return {}
+	return JSON.stringify(save_object)
 
-func load() -> Dictionary:
+func load() -> bool:
+
 	# TODO restor the state from the string or whatever that save produces
-	return {}
+	return true
 
-func remove_reminder(time: GameTime) -> void:
+func remove_reminder(time: GameTime, name: String = null) -> void:
 	if _reminders.has(time.get_date_as_string()):
-		_reminders.erase(time.get_date_as_string())
+		if (name != null) && _reminders.get(time.get_date_as_string()).name == name:
+			_reminders.erase(time.get_date_as_string())
 	if _repeating_reminders.has(time.get_date_as_string()):
-		_repeating_reminders.erase(time.get_date_as_string())
+		if (name != null) && _repeating_reminders.get(time.get_date_as_string()).name == name:
+			_repeating_reminders.erase(time.get_date_as_string())
 		# If the reminder is for today and is after now, we need to add it to the list of reminders for today
-	if time.is_today(_game_time_this_frame):
-		var new_reminders: Array = []
-		for reminder in _todays_reminders:
-			if !reminder.time.is_same(time):
-				new_reminders.append(reminder)
-		_todays_reminders = new_reminders
-		_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
-		_reminder_index = 0
-		while _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
-			_reminder_index += 1
+	_reset_reminders_for_today(time)
+
+func _reset_reminders_for_today(time: GameTime) -> void:
+	if !time.is_today(_game_time_this_frame):
+		return
+	var new_reminders: Array = []
+	for reminder in _todays_reminders:
+		if !reminder.time.is_same(time):
+			new_reminders.append(reminder)
+	_todays_reminders = new_reminders
+	_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
+	_reminder_index = 0
+	while _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
+		_reminder_index += 1
 
 func remove_current_scheduler() -> void:
 	if day_scheduler == null:
@@ -512,29 +571,20 @@ func remove_current_weather() -> void:
 		return
 	_end_active_weather()
 
-func create_reminder(time: GameTime, repeating: bool = false) -> Observable:
+func create_reminder(time: GameTime,name: String, repeating: bool = false) -> Observable:
 	var observable: Subject = Subject.new()
 	if repeating:
 		if not _repeating_reminders.has(time.get_date_as_string()):
 			_repeating_reminders[time.get_date_as_string()] = []
-		_repeating_reminders[time.get_date_as_string()].append({"observable": observable, "time": time})
+		_repeating_reminders[time.get_date_as_string()].append({"observable": observable, "time": time, "name": name})
 	else:
 		if not _reminders.has(time.get_date_as_string()):
 			_reminders[time.get_date_as_string()] = []
-		_reminders[time.get_date_as_string()].append({"observable": observable, "time": time})
+		_reminders[time.get_date_as_string()].append({"observable": observable, "time": time, "name": name})
 
 	# If the reminder is for today and is after now, we need to add it to the list of reminders for today
-	if time.is_today(_game_time_this_frame) and time.is_after(_game_time_this_frame):
-		if repeating:
-			var new_time: GameTime = time.add_unit(1, TimeUnit.DAY)
-			if not _repeating_reminders.has(new_time.get_date_as_string()):
-				_repeating_reminders[new_time.get_date_as_string()] = []
-			_repeating_reminders[new_time.get_date_as_string()].append({"observable": observable, "time": new_time})
-		_todays_reminders.append({"observable": observable, "time": time})
-		_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
-		_reminder_index = 0
-		while _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
-			_reminder_index += 1
+	if time.is_after(_game_time_this_frame):
+		_reset_reminders_for_today(time)
 
 	return observable.as_observable()
 
@@ -563,21 +613,19 @@ func _populate_reminders(time: GameTime) -> void:
 	if _reminders.has(time.get_date_as_string()):
 		for reminder in _reminders[time.get_date_as_string()]:
 			_todays_reminders.append(reminder)
-		#_reminders.erase(time.get_date_as_string())
 	if _repeating_reminders.has(time.get_date_as_string()):
 		for reminder in _repeating_reminders[time.get_date_as_string()]:
 			_todays_reminders.append(reminder)
 			var new_time = reminder.time.add_unit(1, TimeUnit.DAY)
 			if not _repeating_reminders.has(new_time.get_date_as_string()):
 				_repeating_reminders[new_time.get_date_as_string()] = []
-			_repeating_reminders[new_time.get_date_as_string()].append({"observable": reminder.observable, "time": new_time})
-		#_repeating_reminders.erase(time.get_date_as_string())
+			_repeating_reminders[new_time.get_date_as_string()].append({"observable": reminder.observable, "time": new_time, "name": reminder.name})
 	_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
 
 func _send_potential_reminders() -> void:
 	if (_todays_reminders.size() > 0) and (_reminder_index < _todays_reminders.size()):
 		if _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
-			_todays_reminders[_reminder_index].observable.on_next(true)
+			_todays_reminders[_reminder_index].observable.on_next(_todays_reminders[_reminder_index].name)
 			_reminder_index += 1
 
 func _update_day_state():

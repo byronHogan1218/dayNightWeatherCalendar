@@ -340,6 +340,7 @@ static func lerp(time1: GameTime, time2: GameTime, weight: float) -> float:
 	return lerp(a_epoch, b_epoch, weight)
 
 static func percent_between(current_time: GameTime, start_time: GameTime, end_time: GameTime, name: String = "") -> float:
+	# TODO Remove name parameter
 	if not GameTime.is_in_range(current_time, start_time, end_time):
 		push_error(name + "...Cannot get percentage of time outside of range. Current " + current_time.get_date_time_as_string() + " - A: " + start_time.get_date_time_as_string() + " - B: " + end_time.get_date_time_as_string())
 		return 0
