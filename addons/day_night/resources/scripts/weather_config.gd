@@ -26,3 +26,29 @@ class_name WeatherConfig
 
 func should_trigger() -> bool:
 	return randf() < weather_chance
+
+func save() -> String:
+	return JSON.stringify({
+		"weather_path": weather_condition,
+		"weather_weight": weather_weight,
+		"weather_chance": weather_chance,
+		"day_time_weather_color": day_time_weather_color.to_html(),
+		"day_time_light_intensity": day_time_light_intensity,
+		"night_time_weather_color": night_time_weather_color.to_html(),
+		"night_time_light_intensity": night_time_light_intensity,
+		"minimum_light_intensity": minimum_light_intensity
+	})
+
+func load_from_json(data_string: String) -> void:
+	var data = JSON.parse_string(data_string)
+	if not data is Dictionary:
+		push_error("Invalid data type parsed from JSON! Expected: Dictionary - Got: " + str(typeof(data)))
+		return
+	weather_condition = data.get("weather_path", weather_condition)
+	weather_weight = data.get("weather_weight", weather_weight)
+	weather_chance = data.get("weather_chance", weather_chance)
+	day_time_weather_color = Color.from_string(data.get("day_time_weather_color"), Color.WHITE)
+	day_time_light_intensity = data.get("day_time_light_intensity", day_time_light_intensity)
+	night_time_weather_color = Color.from_string(data.get("night_time_weather_color"), Color.STEEL_BLUE)
+	night_time_light_intensity = data.get("night_time_light_intensity", night_time_light_intensity)
+	minimum_light_intensity = data.get("minimum_light_intensity", minimum_light_intensity)

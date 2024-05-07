@@ -76,3 +76,49 @@ func get_sunset() -> Instant:
 
 func get_sunset_time() -> GameTime:
 	return GameTime.create_from_time(get_sunset())
+
+func save() -> String:
+	return JSON.stringify({
+		"day_name": day_name,
+		"day_color": day_color,
+		"day_time_light_intensity": day_time_light_intensity,
+		"night_color": night_color,
+		"night_time_light_intensity": night_time_light_intensity,
+		"minimum_light_intensity": minimum_light_intensity,
+		"has_night": has_night,# TODO might be removed
+		"sunrise_hour": sunrise_hour,
+		"sunrise_minute": sunrise_minute,
+		"sunrise_second": sunrise_second,
+		"sunrise_millisecond": sunrise_millisecond,
+		"sunset_hour": sunset_hour,
+		"sunset_minute": sunset_minute,
+		"sunset_second": sunset_second,
+		"sunset_millisecond": sunset_millisecond,
+		"day_periods": day_periods.map(func(day_period_config: DayPeriodConfig): return day_period_config.save())
+	})
+
+func load_from_json(data_string: String) -> void:
+	var data = JSON.parse_string(data_string)
+	if not data is Dictionary:
+		push_error("Invalid data type parsed from JSON! Expected: Dictionary - Got: " + str(typeof(data)))
+		return
+	day_name = data["day_name"]
+	day_color = data["day_color"]
+	night_color = data["night_color"]
+	day_time_light_intensity = data["day_time_light_intensity"]
+	night_time_light_intensity = data["night_time_light_intensity"]
+	minimum_light_intensity = data["minimum_light_intensity"]
+	has_night = data["has_night"]
+	sunrise_hour = data["sunrise_hour"]
+	sunrise_minute = data["sunrise_minute"]
+	sunrise_second = data["sunrise_second"]
+	sunrise_millisecond = data["sunrise_millisecond"]
+	sunset_hour = data["sunset_hour"]
+	sunset_minute = data["sunset_minute"]
+	sunset_second = data["sunset_second"]
+	sunset_millisecond = data["sunset_millisecond"]
+	day_periods = []
+	for day_config_string in data.get("day_configs", []):
+		var new_day_period: DayPeriodConfig = DayPeriodConfig.new()
+		new_day_period.load_from_json(day_config_string)
+		day_periods.append(new_day_period)

@@ -83,6 +83,50 @@ func pick_weather() -> WeatherConfig:
 		return _pick_weighted_element(weather_conditions)
 	return null
 
+func save() -> String:
+	return JSON.stringify({
+		"period_name": period_name,
+		"day_time_period_color": day_time_period_color.to_html(),
+		"night_time_period_color": night_time_period_color.to_html(),
+		"day_time_light_intensity": day_time_light_intensity,
+		"night_time_light_intensity": night_time_light_intensity,
+		"minimum_light_intensity": minimum_light_intensity,
+		"start_hour": start_hour,
+		"start_minute": start_minute,
+		"start_second": start_second,
+		"start_millisecond": start_millisecond,
+		"length_hour": length_hour,
+		"length_minute": length_minute,
+		"length_second": length_second,
+		"length_millisecond": length_millisecond,
+		"weather_conditions": weather_conditions.map(func(weather_config: WeatherConfig): return weather_config.save())
+	})
+
+func load_from_json(data_string: String) -> void:
+	var data = JSON.parse_string(data_string)
+	if not data is Dictionary:
+		push_error("Invalid data type parsed from JSON! Expected: Dictionary - Got: " + str(typeof(data)))
+		return
+	period_name = data.get("period_name", "")
+	day_time_period_color = Color.from_string(data.get("day_time_period_color"), Color.WHITE)
+	night_time_period_color = Color.from_string(data.get("night_time_period_color"), Color.STEEL_BLUE)
+	day_time_light_intensity = data.get("day_time_light_intensity", 1.0)
+	night_time_light_intensity = data.get("night_time_light_intensity", 1.0)
+	minimum_light_intensity = data.get("minimum_light_intensity", 0.0)
+	start_hour = data.get("start_hour", 0)
+	start_minute = data.get("start_minute", 0)
+	start_second = data.get("start_second", 0)
+	start_millisecond = data.get("start_millisecond", 0)
+	length_hour = data.get("length_hour", 0)
+	length_minute = data.get("length_minute", 0)
+	length_second = data.get("length_second", 0)
+	length_millisecond = data.get("length_millisecond", 0)
+	weather_conditions = []
+	for weather_config_string in data.get("weather_conditions", []):
+		var weather_config: WeatherConfig = WeatherConfig.new()
+		weather_config.load_from_json(weather_config_string)
+		weather_conditions.append(weather_config)
+
 
 func _pick_weighted_element(weather_configs: Array[WeatherConfig])-> WeatherConfig:
 	var total_weight: int = 0

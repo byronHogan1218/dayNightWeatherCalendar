@@ -78,22 +78,39 @@ func get_current_index() -> int:
 func reset_index(value: int = 0) -> void:
 	_index = clampi(value, 0, day_configs.size() - 1)
 
-func save() -> Dictionary:
+func save() -> String:
 	# TODO relook at
-	return {
+	return JSON.stringify({
 		"length": day_configs.size(),
 		"config_indexes": _ordered_config_indexes,
-		"index": _index
-	}
+		"index": _index,
+		"name": scheduler_name,
+		"should_repeat": should_repeat,
+		"buffer_size": buffer_size,
+		"selection_type": selection_type,
+		"day_configs": day_configs.map(func(day_config): day_config.save()),
+	})
 
-func load(data: Dictionary) -> void:
-	# TODO relook at
+func load_from_json(data_string: String) -> void:
+	var data = JSON.parse_string(data_string)
+	if not data is Dictionary:
+		push_error("Invalid data type parsed from JSON! Expected: Dictionary - Got: " + str(typeof(data)))
+		return
 	if data.get("length", 0) != day_configs.size():
 		printerr("Could not load Day Scheduler. Mismatching length.")
 		push_error("Day Scheduler length does not match while loading. Expected: " + str(day_configs.size()) + " - Got: " + str(data.get("length", 0)))
 		return
-	_ordered_config_indexes = data.get("config_indexes", null)
+	_ordered_config_indexes = data.get("config_indexes", [])
 	_index = data.get("index", 0)
+	scheduler_name = data.get("name", null)
+	should_repeat = data.get("should_repeat", false)
+	buffer_size = data.get("buffer_size", 1)
+	selection_type = data.get("selection_type", "In Order")
+	day_configs = []
+	for day_config_string in data.get("day_configs", []):
+		var new_day_config: DayConfig = DayConfig.new()
+		new_day_config.load_from_json(day_config_string)
+		day_configs.append(new_day_config)
 
 func _create_ordered_config_indexes() -> void:
 	if selection_type == "In Order":
