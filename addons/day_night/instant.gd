@@ -36,12 +36,12 @@ var _millisecond: int
 var _is_negative: bool
 
 func _init(year: int, days: int, hours: int, minutes: int, seconds: int, milliseconds: int, is_negative: bool = false):
-	self._year = year
-	self._day = days
-	self._hour = hours
-	self._minute = minutes
-	self._second = seconds
-	self._millisecond = milliseconds
+	self._year = abs(year)
+	self._day = abs(days)
+	self._hour = abs(hours)
+	self._minute = abs(minutes)
+	self._second = abs(seconds)
+	self._millisecond = abs(milliseconds)
 	var year_milliseconds: int = self._year * GameTime.YEAR_DIVISOR
 	var days_milliseconds: int = self._day * GameTime.DAY_DIVISOR
 	var hours_milliseconds: int = self._hour * GameTime.HOUR_DIVISOR
