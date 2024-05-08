@@ -1,40 +1,84 @@
 extends Node
-# TODO change color of ambient lighting to light color
-# TODO turn off sun at night and only have ambient lighting
+class_name DayNightCycle
+## A brief description of the class's role and functionality.
+## TODO: do better here
+##
+## The description of the script, what it can do,
+## and any further detail.
+##
+## @tutorial:            https://the/tutorial1/url.com
+## @tutorial(Tutorial2): https://the/tutorial2/url.com
+## @experimental
+
+
 # TODO code cleanup, public on top, function docs, DRY
-# TODO make example scenes
+# TODO make example scenes(have stop time too): saving/loading, no scheduler, warp time, scheduler(all types)
 # TODO Write readme
 # TODO Try 2d
 # TODO Icon for day night node
 # TODO check godot making a plugin for anything missed
 # TODO publish
 
-const _VERSION: String = "1.0.0"
+## This is the game version that will be looked for when loading saves.
+## Please note that this should reflect your game version and you will need to handle any differences between versions
+const _GAME_VERSION: String = "1.0.0"
+## This is the plugin version that will be looked for when loading saves.
+## Please note that this should never change. It is for the plugin to coerce different versions of this to be able to maintain the code if possible
+const _PLUGIN_VERSION: String = "1.0.0"
+
+## This is the minimim amount of time in seconds that can be set for a day
 const _MIN_DAY_LENGTH: int = 3
+## This represents 100% of a day
 const _FULL_DAY_PERCENTAGE: int = 1
-const _MAX_DAY_LENGTH: int = 8640000 # 100 * an earth day length in seconds
+## This is the maximum amount of time in seconds that can be set for a day
+## It is calculate to be 100 * an earth day length in seconds
+const _MAX_DAY_LENGTH: int = 8640000
+## This is the maximum multiplier that can be set
 const _MAX_TIME_MULTIPLIER: float = 100.0
-## Higher the value, the slower the transition will be
-const _AUTO_COLOR_TRANSTION: float = 30
+## This helps to regulate the color transition period.
+## Higher the value, the slower the transition will be.
+const _AUTO_COLOR_TRANSTION: float = 100
+## This is the maximum light intensity that can be set
 const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 
+## When set, the day night cycle will move and control the light color automatically
+## This is not required to be set if you want to manually control the light parameters
 @export var sun: DirectionalLight3D
+## When set, the day night cycle control the ambient light color automatically
+## This is not required to be set if you want to manually control the light parameters
+@export var environment: WorldEnvironment
+## This is how long the day will last in earth time seconds
 @export var day_lenth_in_seconds: int = 5 :
 	get:
 		return day_lenth_in_seconds
 	set(value):
 		day_lenth_in_seconds = clamp(value, _MIN_DAY_LENGTH, _MAX_DAY_LENGTH)
-@export var days_in_year: int = 1
+## How many days in the game time year, Clamped between 1-1_000_000_000
+@export var days_in_year: int = 1 :
+	get:
+		return days_in_year
+	set(value):
+		days_in_year = clamp(value, 1, 1_000_000_000)
+## If set to true, start year will be before 0 and it will count down to zero before counting up
 @export var before_year_zero: bool = false
+## The year time that will be used as the start time
 @export var start_year: int = 0
+## The day time that will be used as the start time
 @export var start_day: int = 0
+## The hour time that will be used as the start time
 @export var start_hour: int = 0
+## The minute time that will be used as the start time
 @export var start_minute: int = 0
+## The second time that will be used as the start time
 @export var start_second: int = 0
-## The day schedule that will be used. This can be null.
+## The day scheduler that will be used. This can be null.
 @export var day_scheduler: DayScheduler
-@export var default_day_config: DayConfig = DayConfig.new()
+## REQUIRED, this will be the default day config. It needs to be defined for a fallback day.
+## This will close the game if it is not set
+@export var default_day_config: DayConfig = null
+## If set to true, the debug info will be shown in the console
 @export var show_debug_info: bool = false
+## The default time speed multiplier that will be used as the initial time speed and the value for reseting the time multilier.
 @export_range(0.1, _MAX_TIME_MULTIPLIER) var default_time_speed_multiplier: float = 1.0
 
 
@@ -54,8 +98,12 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 @onready var _on_day_config_change: Subject = Subject.new()
 @onready var _on_day_scheduler_change: Subject = Subject.new()
 @onready var _on_day_scheduler_finish: Subject = Subject.new()
+## Will emit when the day changes with the day config of the new day
 @onready var on_day_change: Observable = _on_day_change.as_observable()
+## Will emit when the year changes with the day config of the new day
 @onready var on_year_change: Observable = _on_year_change.as_observable()
+## Will emit when the night time starts with the [GameTime] of when the night time starts
+## The time emitted is not the time that the night time starts but the first tick of time past the sunset time of the current [DayConfig]
 @onready var on_night_time_start: Observable = _on_night_time_start.as_observable()
 @onready var on_day_time_start: Observable = _on_day_time_start.as_observable()
 @onready var on_time_paused: Observable = _on_time_paused.as_observable()
@@ -105,7 +153,6 @@ var _yesterday: DayConfig
 
 var _is_day: bool = false
 
-# Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# TODO cleanup ready func
 	if show_debug_info:
@@ -119,9 +166,9 @@ func _ready() -> void:
 	
 	set_time(GameTime.create_from_time(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0, before_year_zero)))
 	#print(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS).get_time_as_string())
-	var o = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS),"1", true)
-	var o2 = create_reminder(_current_date_at_start_of_day.add_unit(12, TimeUnit.HOURS),"noon", true)
-	var o3 = create_reminder(_current_date_at_start_of_day.add_unit(14, TimeUnit.HOURS),"2", true)
+	var o: Observable = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS),"1", true)
+	var o2: Observable = create_reminder(_current_date_at_start_of_day.add_unit(12, TimeUnit.HOURS),"noon", true)
+	var o3: Observable = create_reminder(_current_date_at_start_of_day.add_unit(14, TimeUnit.HOURS),"2", true)
 
 	on_day_change \
 		.subscribe(func(newTime: GameTime): _populate_reminders(newTime)).dispose_with(self)
@@ -144,7 +191,7 @@ func _ready() -> void:
 #	on_day_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("day time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 #	on_night_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("night time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 	print("setting time this frame to: " + _game_time_this_frame.get_date_as_string() + " - " + _game_time_this_frame.get_time_as_string())
-	alter_time_speed(10, _game_time_this_frame.add_unit(3,TimeUnit.DAY))
+#	alter_time_speed(10, _game_time_this_frame.add_unit(3,TimeUnit.DAY))
 	# NEEDED
 	if (_day_config != null) && (_day_config.day_periods != null):
 		_has_day_periods = true
@@ -168,11 +215,11 @@ func _process(delta: float):
 	_update_day_state()
 
 	if sun != null:
-		var rotation: Vector3 = get_sun_rotation()
-		sun.rotation.x = deg_to_rad(rotation.x)
-		sun.rotation.y = deg_to_rad(rotation.y)
+		sun.rotation.x = deg_to_rad(get_sun_rotation().x)
 		sun.set_color(get_light_color(delta))
-		sun.light_energy = calculate_light_intesity()
+		sun.light_energy = calculate_light_intesity() if _is_day else 0.0
+	if environment != null:
+		environment.environment.ambient_light_energy = calculate_light_intesity() if !_is_day else 0
 
 func _handle_time_speed():
 	if (_time_to_stop_multiplier != null) && (_game_time_this_frame.is_after_or_same(_time_to_stop_multiplier)):
@@ -398,12 +445,13 @@ func set_time(time: GameTime) -> void:
 	_calculate_milestone_times()
 
 	if sun:
-		var rotation: Vector3 = get_sun_rotation()
-		sun.rotation.x = deg_to_rad(rotation.x)
-		sun.rotation.y = deg_to_rad(rotation.y)
+		sun.rotation.x = deg_to_rad(get_sun_rotation().x)
 		sun.set_color(get_light_color(0,true))
 		sun.light_energy = calculate_light_intesity()
+	if environment != null:
+		environment.environment.ambient_light_energy = calculate_light_intesity() if !_is_day else 0
 
+## THIS IS A COMMENT
 func get_time_this_frame() -> GameTime:
 	return _game_time_this_frame
 
@@ -467,8 +515,7 @@ func get_sun_rotation() -> Vector3:
 			percentage = (current / total)
 		angle = lerp(180, 360, percentage)
 
-	# The x axis needs to be offset by 180 to get the correct angle
-	return Vector3(angle + 180, angle, 0)
+	return Vector3(angle+ 180,0, 0)
 
 func is_night_before_midnight() -> bool:
 	if is_day():
@@ -492,7 +539,8 @@ func save_reminders() -> Dictionary:
 
 func save() -> String:
 	var save_object: Dictionary = {
-		"version": _VERSION,
+		"game_version": _GAME_VERSION,
+		"plugin_version": _PLUGIN_VERSION,
 		"current_time": _game_time_this_frame.get_epoch(),
 		"time_speed_multiplier": _time_speed_multiplier,
 		"time_to_stop_multiplier": _time_to_stop_multiplier.get_epoch() if _time_to_stop_multiplier != null else null,
@@ -514,8 +562,11 @@ func load(data_string: String) -> bool:
 	if not data is Dictionary:
 		push_error("Invalid data type parsed from JSON! Expected: Dictionary - Got: " + str(typeof(data)))
 		return false
-	if data.get("version", 0) != _VERSION:
-		push_error("Invalid version! Expected: " + str(_VERSION) + " - Got: " + str(data.get("version", 0)))
+	if data.get("game_version", "unknown") != _GAME_VERSION:
+		push_error("Invalid game version! Expected: " + str(_GAME_VERSION) + " - Got: " + str(data.get("game_version", "unknown")))
+		return false
+	if data.get("pugin_version", "unknown") != _PLUGIN_VERSION:
+		push_error("Invalid game version! Expected: " + str(_PLUGIN_VERSION) + " - Got: " + str(data.get("plugin_version", "unknown")))
 		return false
 	_game_time_this_frame = GameTime.new(data.get("current_time", 0))
 	_time_speed_multiplier = data.get("time_speed_multiplier", default_time_speed_multiplier)
@@ -620,7 +671,6 @@ func alter_time_speed(time_multiplier: float, time_to_stop_at: GameTime = null)-
 			push_error("Must set time to stop at a time after the current time: Current Time[ " + _game_time_this_frame.get_date_as_string()+ " | " + _game_time_this_frame.get_time_as_string() + " ] - Time to stop at [ " + time_to_stop_at.get_date_as_string()+ " | " + time_to_stop_at.get_time_as_string() + " ]")
 			return
 		_time_to_stop_multiplier = time_to_stop_at
-		print ("Setting time to stop at: " + time_to_stop_at.get_date_as_string() + " - " + time_to_stop_at.get_time_as_string())
 	_on_time_speed_change.on_next(time_multiplier)
 	_time_speed_multiplier = time_multiplier
 

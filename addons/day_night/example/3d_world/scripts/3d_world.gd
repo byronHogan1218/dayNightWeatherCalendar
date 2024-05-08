@@ -5,7 +5,7 @@ extends Node
 @onready var time_multiplier_label: Label = $TimeMultiplier
 @onready var sun_intensity_label: Label = $"Sun intensity"
 
-@onready var day_night = get_node("DayNightCycle")
+@onready var day_night: DayNightCycle = get_node("DayNightCycle")
 
 
 func _process(delta: float) -> void:

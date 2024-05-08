@@ -1,41 +1,55 @@
-[gd_scene load_steps=8 format=3 uid="uid://1rwjebm5rolk"]
+[gd_scene load_steps=13 format=3 uid="uid://1rwjebm5rolk"]
 
 [ext_resource type="Script" path="res://addons/day_night/day_night_cycle.gd" id="1_fe7bq"]
 [ext_resource type="Script" path="res://addons/day_night/example/3d_world/scripts/3d_world.gd" id="1_nxd1w"]
 [ext_resource type="Resource" uid="uid://box57qhyqsg2p" path="res://addons/day_night/resources/normal.tres" id="2_kh4i3"]
 [ext_resource type="Resource" uid="uid://6hl8mckxeagt" path="res://addons/day_night/resources/scheduler.tres" id="3_xcuvk"]
 [ext_resource type="PackedScene" uid="uid://gfv43oe5s608" path="res://addons/day_night/example/3d_world/weather.tscn" id="4_0b4wp"]
+[ext_resource type="PackedScene" uid="uid://dh1wo07skclsq" path="res://addons/day_night/example/3d_world/Player.tscn" id="6_4auvo"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_g4coi"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_lk25f"]
+sky_material = SubResource("ProceduralSkyMaterial_g4coi")
+
+[sub_resource type="Environment" id="Environment_6iu4r"]
+background_mode = 2
+sky = SubResource("Sky_lk25f")
+ambient_light_energy = 0.0
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="SphereMesh" id="SphereMesh_kmr42"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_7kbuq"]
 
-[sub_resource type="SphereMesh" id="SphereMesh_kmr42"]
+[sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_3dgtj"]
 
 [node name="3dWorld" type="Node3D"]
 script = ExtResource("1_nxd1w")
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-0.984807, -0.086824, -0.150384, -1.51421e-07, -0.866026, 0.5, -0.173648, 0.492404, 0.852868, 0, 0, 0)
-shadow_enabled = true
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_6iu4r")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0)
-mesh = SubResource("PlaneMesh_7kbuq")
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.999999, -1.71707e-07, -2.32156e-08, 2.32156e-08, 0.265556, -0.964095, 1.71707e-07, 0.964096, 0.265556, 0, 0, 0)
+shadow_enabled = true
 
 [node name="MeshInstance3D2" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("SphereMesh_kmr42")
 
-[node name="DayNightCycle" type="Node" parent="." node_paths=PackedStringArray("sun")]
+[node name="DayNightCycle" type="Node" parent="." node_paths=PackedStringArray("sun", "environment")]
 script = ExtResource("1_fe7bq")
 sun = NodePath("../Sun")
-day_lenth_in_seconds = 30
+environment = NodePath("../WorldEnvironment")
+day_lenth_in_seconds = 600
 days_in_year = 4
 start_hour = 3
 day_scheduler = ExtResource("3_xcuvk")
 default_day_config = ExtResource("2_kh4i3")
-
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.940395, 0.340084, 0, -0.340084, 0.940395, 0, 1.47507, 2.99081)
 
 [node name="Date" type="Label" parent="."]
 offset_right = 358.0
@@ -67,3 +81,21 @@ text = "SUN INTENSITY"
 horizontal_alignment = 1
 
 [node name="Weather" parent="." instance=ExtResource("4_0b4wp")]
+
+[node name="Player" parent="." node_paths=PackedStringArray("camera") instance=ExtResource("6_4auvo")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+camera = NodePath("Camera3D")
+
+[node name="Camera3D" type="Camera3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 0.998083, -0.0618849, 0, 0.0618849, 0.998083, 0, 0, 0)
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0)
+mesh = SubResource("PlaneMesh_7kbuq")
+skeleton = NodePath("../..")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0)
+shape = SubResource("WorldBoundaryShape3D_3dgtj")

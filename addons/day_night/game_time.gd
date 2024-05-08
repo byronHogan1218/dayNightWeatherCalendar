@@ -1,5 +1,9 @@
 class_name GameTime
 
+## GAME TIME
+##
+## This is a time that can be used in any game
+
 var _epoch:int # in milliseconds
 
 ## Equivalent to 86_400_000
