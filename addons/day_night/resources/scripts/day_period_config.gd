@@ -2,7 +2,7 @@ extends Resource
 class_name DayPeriodConfig
 
 ## This [Resource] represents a day period configuration that can be used in a [DayConfig].
-## It has the configurable properties for a period in a day configuration; like the color and intensity of the light, any weather effects to trigger, etc.
+## It has the configurable properties for a period in a [DayConfig]; like the color and intensity of the light, any weather effects to trigger, etc.
 ## [br][br] Usage:
 ## [br]NOTE: This is primarily meant to be created from the "Create New > Resource" context menu in the Godot Editor
 ## [codeblock]

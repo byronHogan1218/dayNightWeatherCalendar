@@ -1,12 +1,28 @@
 extends Resource
 class_name WeatherConfig
 
+## This [Resource] represents a weather configuration that can be used in a [DayPeriodConfig].
+## It has the configurable properties for a weather effect to be triggered in a [DayPeriodConfig]; like the color and intensity of the light, a path to a node that contains the weather effect, etc.
+## [br][br] Usage:
+## [br]NOTE: This is primarily meant to be created from the "Create New > Resource" context menu in the Godot Editor
+## [codeblock]
+## var weather_condition = WeatherConfig.new()
+## weather_condition.weather_path = "res://addons/day_night/resources/weather_effects/Clouds.tscn" # Example Path
+## weather_condition.weather_weight = 1
+## weather_condition.weather_chance = 1
+## weather_condition.day_time_weather_color = Color(.9922,.9843,.8275,1)
+## weather_condition.day_time_light_intensity = 1
+## weather_condition.night_time_weather_color = Color(0,0,0,1)
+## weather_condition.night_time_light_intensity = 0
+## weather_condition.minimum_light_intensity = 0.01
+## [/codeblock]
+
 @export_category("Weather Configuration")
 
 ## The path to the node that contains the weather condition if picked and triggered
 @export var weather_condition: NodePath
 
-## How likely this weather conditon is to be picked from the possible weather conditions. Higher value = more likely
+## How likely this weather conditon is to be picked from the possible weather conditions in a [DayPeriodConfig]. Higher value = more likely
 @export_range(0,1000,1) var weather_weight: int = 1
 ## If picked, how likely this weather condition is to trigger. Higher value = more likely
 @export_range(0,1,0.01) var weather_chance: float = 1
@@ -23,10 +39,11 @@ class_name WeatherConfig
 ## The the lowest the light intensity can be if this weather condition is picked and triggered
 @export_range(0,16,.01) var minimum_light_intensity: float = .1
 
-
+## Returns [code]true[/code] if this weather condition should be triggered, [code]false[/code] otherwise.
 func should_trigger() -> bool:
 	return randf() < weather_chance
 
+## Returs a JSON string of the weather config state
 func save() -> String:
 	return JSON.stringify({
 		"weather_path": weather_condition,
@@ -39,6 +56,7 @@ func save() -> String:
 		"minimum_light_intensity": minimum_light_intensity
 	})
 
+## Loads the weather config state from a JSON string
 func load_from_json(data_string: String) -> void:
 	var data = JSON.parse_string(data_string)
 	if not data is Dictionary:
