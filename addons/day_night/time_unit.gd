@@ -1,44 +1,28 @@
 class_name TimeUnit
 
-const YEARS: String = "years"
-const YEAR: String = "year"
-const DAYS: String = "days"
-const DAY: String = "day"
-const HOURS: String = "hours"
-const HOUR: String = "hour"
-const MINUTES: String = "minutes"
-const MINUTE: String = "minute"
-const SECONDS: String = "seconds"
-const SECOND: String = "second"
-const MILLISECONDS: String = "milliseconds"
-const MILLISECOND: String = "millisecond"
+## Represents constants for time units
 
-#func _to_string() -> String:
-	#match unit:
-		#TimeUnit.YEARS:
-			#return "years"
-		#TimeUnit.YEAR:
-			#return "year"
-		#TimeUnit.DAYS:
-			#return "days"
-		#TimeUnit.DAY:
-			#return "day"
-		#TimeUnit.HOURS:
-			#return "hours"
-		#TimeUnit.HOUR:
-			#return "hour"
-		#TimeUnit.MINUTES:
-			#return "minutes"
-		#TimeUnit.MINUTE:
-			#return "minute"
-		#TimeUnit.SECONDS:
-			#return "seconds"
-		#TimeUnit.SECOND:
-			#return "second"
-		#TimeUnit.MILLISECONDS:
-			#return "milliseconds"
-		#TimeUnit.MILLISECOND:
-			#return "millisecond"
-		#_:
-			#push_error("Invalid time unit: unknown unit")
-			#return ""
+## Represents the time unit for a year
+const YEARS: String = "years"
+## Represents the time unit for a year
+const YEAR: String = "year"
+## Represents the time unit for a day
+const DAYS: String = "days"
+## Represents the time unit for a day
+const DAY: String = "day"
+## Represents the time unit for an hour
+const HOURS: String = "hours"
+## Represents the time unit for an hour
+const HOUR: String = "hour"
+## Represents the time unit for a minute
+const MINUTES: String = "minutes"
+## Represents the time unit for a minute
+const MINUTE: String = "minute"
+## Represents the time unit for a second
+const SECONDS: String = "seconds"
+## Represents the time unit for a second
+const SECOND: String = "second"
+## Represents the time unit for a millisecond
+const MILLISECONDS: String = "milliseconds"
+## Represents the time unit for a millisecond
+const MILLISECOND: String = "millisecond"

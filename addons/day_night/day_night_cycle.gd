@@ -164,7 +164,7 @@ func _ready() -> void:
 	GameTime.DAYS_IN_YEAR = days_in_year
 	GameTime.YEAR_DIVISOR = GameTime.DAYS_IN_YEAR * GameTime.DAY_DIVISOR
 	
-	set_time(GameTime.create_from_time(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0, before_year_zero)))
+	set_time(GameTime.create_from_instant(Instant.new(start_year, start_day, start_hour, start_minute, start_second, 0, before_year_zero)))
 	#print(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS).get_time_as_string())
 	var o: Observable = create_reminder(_current_date_at_start_of_day.add_unit(13, TimeUnit.HOURS),"1", true)
 	var o2: Observable = create_reminder(_current_date_at_start_of_day.add_unit(12, TimeUnit.HOURS),"noon", true)
@@ -191,7 +191,7 @@ func _ready() -> void:
 #	on_day_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("day time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 #	on_night_time_start.as_observable().filter(func(newTime: GameTime): return newTime !=null).subscribe(func(time): print("night time start: " + time.get_date_as_string() + " - " + time.get_time_as_string())).dispose_with(self)
 	print("setting time this frame to: " + _game_time_this_frame.get_date_as_string() + " - " + _game_time_this_frame.get_time_as_string())
-#	alter_time_speed(10, _game_time_this_frame.add_unit(3,TimeUnit.DAY))
+	alter_time_speed(10, _game_time_this_frame.add_unit(1,TimeUnit.DAY))
 	# NEEDED
 	if (_day_config != null) && (_day_config.day_periods != null):
 		_has_day_periods = true
@@ -292,7 +292,7 @@ func handle_day_end():
 	_yesterday = _day_config
 	var old_start_of_date = GameTime.new(_current_date_at_start_of_day.get_epoch())
 	_current_date_at_start_of_day = _current_date_at_start_of_day.add_unit(1, TimeUnit.DAY)
-	_current_date_at_end_of_day = _current_date_at_start_of_day.set_time(Instant.new(
+	_current_date_at_end_of_day = GameTime.create_from_instant(Instant.new(
 		_current_date_at_start_of_day.get_year(),
 		_current_date_at_start_of_day.get_day(),
 		23,
@@ -329,8 +329,8 @@ func handle_day_end():
 		_has_day_periods = false
 
 	_percentage_through_day -= _FULL_DAY_PERCENTAGE
-	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunrise()))
-	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunset()))
+	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunrise()))
+	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunset()))
 
 	_game_time_this_frame = _calculate_game_time_for_frame()
 	_calculate_milestone_times()
@@ -404,7 +404,7 @@ func _calculate_milestone_times() -> void:
 	_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
 
 func set_time(time: GameTime) -> void:
-	_current_date_at_start_of_day = time.set_time(Instant.new(
+	_current_date_at_start_of_day = GameTime.create_from_instant(Instant.new(
 		time.get_year(),
 		time.get_day(),
 		0,
@@ -412,7 +412,7 @@ func set_time(time: GameTime) -> void:
 		0,
 		0
 	))
-	_current_date_at_end_of_day = time.set_time(Instant.new(
+	_current_date_at_end_of_day = GameTime.create_from_instant(Instant.new(
 		time.get_year(),
 		time.get_day(),
 		23,
@@ -437,8 +437,8 @@ func set_time(time: GameTime) -> void:
 
 	_percentage_through_day = _calculate_percent_of_day_by_time(time)
 	_game_time_this_frame = _calculate_game_time_for_frame()
-	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunrise()))
-	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_time(_day_config.get_sunset()))
+	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunrise()))
+	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunset()))
 	_update_day_state()
 	_populate_reminders(_current_date_at_start_of_day)
 	_is_day = (_percentage_through_day >= _sunrise_start_percentage) && (_percentage_through_day < _sunset_start_percentage)
@@ -602,7 +602,7 @@ func remove_reminder(time: GameTime, name: String = "") -> void:
 	if time.is_today(_game_time_this_frame):
 		var new_reminders: Array = []
 		for reminder in _todays_reminders:
-			if !reminder.time.is_same(time):
+			if !reminder.time.is_same_time(time):
 				new_reminders.append(reminder)
 		_todays_reminders = new_reminders
 		_reset_reminders_for_today()

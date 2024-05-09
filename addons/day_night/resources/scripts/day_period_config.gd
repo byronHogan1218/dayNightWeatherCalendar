@@ -88,7 +88,7 @@ func get_start(year: int, day: int) -> Instant:
 
 ## Returns the period start time as a [GameTime]
 func get_start_time(year: int, day: int) -> GameTime:
-	return GameTime.create_from_time(get_start(year,day))
+	return GameTime.create_from_instant(get_start(year,day))
 
 ## Returns the period length as a [Duration]
 func get_duration(start_year: int, start_day: int) -> Duration:

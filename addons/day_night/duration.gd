@@ -1,6 +1,8 @@
 class_name Duration
 
-var _start:GameTime
+## TODO write docs
+
+var _start: GameTime
 var _end: GameTime
 var _duration_in_millisecond: int
 
@@ -52,10 +54,10 @@ func duration_length_in_units(unit: TimeUnit) -> int:
 			return 0
 
 static func create_from_instant(start: Instant, end: Instant) -> Duration:
-	return Duration.new(GameTime.create_from_time(start), GameTime.create_from_time(end))
+	return Duration.new(GameTime.create_from_instant(start), GameTime.create_from_instant(end))
 
 static func create_from_length(start: Instant, years: int, days: int, hours: int, minutes: int, seconds: int, milliseconds: int) -> Duration:
-	var start_time: GameTime = GameTime.create_from_time(start)
+	var start_time: GameTime = GameTime.create_from_instant(start)
 	var end: GameTime = GameTime.new(start.get_epoch())
 	if years > 0:
 		end = end.add_unit(years, TimeUnit.YEAR)

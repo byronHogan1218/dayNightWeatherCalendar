@@ -102,7 +102,7 @@ func get_sunrise() -> Instant:
 
 ## Returns a [GameTime] representing the sunrise time
 func get_sunrise_time() -> GameTime:
-	return GameTime.create_from_time(get_sunrise())
+	return GameTime.create_from_instant(get_sunrise())
 
 ## Returns an [Instant] representing the sunset time
 func get_sunset() -> Instant:
@@ -110,7 +110,7 @@ func get_sunset() -> Instant:
 
 ## Returns a [GameTime] representing the sunset time
 func get_sunset_time() -> GameTime:
-	return GameTime.create_from_time(get_sunset())
+	return GameTime.create_from_instant(get_sunset())
 
 ## Returns a JSON string of the day config state
 func save() -> String:
