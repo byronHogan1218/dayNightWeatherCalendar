@@ -41,12 +41,23 @@ const _AUTO_COLOR_TRANSTION: float = 100
 ## This is the maximum light intensity that can be set
 const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 
+#@export_category("Default Day Config Settings")
+## REQUIRED, this will be the default day config. It needs to be defined for a fallback day.
+## This will close the game if it is not set
+@export var default_day_config: DayConfig = null
+
+
+@export_category("Auto Control Settings")
 ## When set, the day night cycle will move and control the light color automatically
 ## This is not required to be set if you want to manually control the light parameters
 @export var sun: DirectionalLight3D
 ## When set, the day night cycle control the ambient light color automatically
 ## This is not required to be set if you want to manually control the light parameters
 @export var environment: WorldEnvironment
+## The day scheduler that will be used. This can be null.
+@export var day_scheduler: DayScheduler
+
+@export_group("Time Settings")
 ## This is how long the day will last in earth time seconds
 @export var day_lenth_in_seconds: int = 5 :
 	get:
@@ -59,6 +70,11 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 		return days_in_year
 	set(value):
 		days_in_year = clamp(value, 1, 1_000_000_000)
+## The default time speed multiplier that will be used as the initial time speed and the value for reseting the time multilier.
+@export_range(0.1, _MAX_TIME_MULTIPLIER) var default_time_speed_multiplier: float = 1.0
+
+
+@export_group("Begining of Time Settings")
 ## If set to true, start year will be before 0 and it will count down to zero before counting up
 @export var before_year_zero: bool = false
 ## The year time that will be used as the start time
@@ -71,16 +87,15 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 @export var start_minute: int = 0
 ## The second time that will be used as the start time
 @export var start_second: int = 0
-## The day scheduler that will be used. This can be null.
-@export var day_scheduler: DayScheduler
-## REQUIRED, this will be the default day config. It needs to be defined for a fallback day.
-## This will close the game if it is not set
-@export var default_day_config: DayConfig = null
-## If set to true, the debug info will be shown in the console
-@export var show_debug_info: bool = false
-## The default time speed multiplier that will be used as the initial time speed and the value for reseting the time multilier.
-@export_range(0.1, _MAX_TIME_MULTIPLIER) var default_time_speed_multiplier: float = 1.0
 
+@export_group("Misc Settings")
+## If set to [code]true[/code], all of the calculated details will be recalculated every frame even when the time is paused.
+## This is helpful if you want the information to be up to date even when the time calculation is paused.
+## If set to [code]false[/code], the calculations will only be recalculated when the time is not paused
+## This saves on performance if you are not going to be altering any time details when the game is paused
+@export var should_calculate_when_paused: bool = true
+## If set to [code]true[/code], the debug info will be shown in the console
+@export var show_debug_info: bool = false
 
 @onready var _on_day_change: Subject = Subject.new()
 @onready var _on_year_change: Subject = Subject.new()
@@ -98,25 +113,41 @@ const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 @onready var _on_day_config_change: Subject = Subject.new()
 @onready var _on_day_scheduler_change: Subject = Subject.new()
 @onready var _on_day_scheduler_finish: Subject = Subject.new()
-## Will emit when the day changes with the day config of the new day
+## Will emit when the day changes with the [GameTime] of the new day
 @onready var on_day_change: Observable = _on_day_change.as_observable()
-## Will emit when the year changes with the day config of the new day
+## Will emit when the year changes with the [GameTime] of the new day
 @onready var on_year_change: Observable = _on_year_change.as_observable()
-## Will emit when the night time starts with the [GameTime] of when the night time starts
+## Will emit when the night time starts with the [GameTime] of when the night time starts.
 ## The time emitted is not the time that the night time starts but the first tick of time past the sunset time of the current [DayConfig]
 @onready var on_night_time_start: Observable = _on_night_time_start.as_observable()
+## Will emit when the day time starts with the [GameTime] of when the day time starts.
+## The time emitted is not the time that the day time starts but the first tick of time past the sunrise time of the current [DayConfig]
 @onready var on_day_time_start: Observable = _on_day_time_start.as_observable()
+## Will emit when the time progession is paused. If the time is already pause, it will not emit again
 @onready var on_time_paused: Observable = _on_time_paused.as_observable()
+## Will emit when the time progession is resumed. If the time is already resumed, it will not emit again
 @onready var on_time_resumed: Observable = _on_time_resumed.as_observable()
+## Will emit when the time speed changes with the new time speed multiplier as a [code]float[/code]
 @onready var on_time_speed_change: Observable = _on_time_speed_change.as_observable()
+## Will emit when the altering of the time speed ends with the [GameTime] of when the time speed ends
 @onready var on_time_speed_end: Observable = _on_time_speed_end.as_observable()
+## Will emit when a new day period starts with the [DayPeriodConfig] of the new period
 @onready var on_day_period_start: Observable = _on_day_period_start.as_observable()
+## Will emit when a day period ends with the [DayPeriodConfig] of the period that ended
 @onready var on_day_period_end: Observable = _on_day_period_end.as_observable()
+## Will emit whenever an existing [DayPeriodConfig] is overwritten with a new one.
+## Emits a [Dictionary] with the old [DayPeriodConfig] (called "old_period") and the new [DayPeriodConfig] (called "new_period").
+## Will emit before the [code]on_day_period_end[/code] event is emitted.
 @onready var on_day_period_overwrite: Observable = _on_day_period_overwrite.as_observable()
+## Will emit when the weather starts with the [WeatherConfig] of the new weather
 @onready var on_weather_start: Observable = _on_weather_start.as_observable()
+## Will emit when the weather ends with the [WeatherConfig] of the weather that ended
 @onready var on_weather_end: Observable = _on_weather_end.as_observable()
+## Will emit when the [DayConfig] changes with the new [DayConfig]
 @onready var on_day_config_change: Observable = _on_day_config_change.as_observable()
+## Will emit when the day scheduler changes with the new [DayScheduler]
 @onready var on_day_scheduler_change: Observable = _on_day_scheduler_change.as_observable()
+## Will emit when the day scheduler finishes with the new [DayScheduler]
 @onready var on_day_scheduler_finish: Observable = _on_day_scheduler_finish.as_observable()
 
 var _percentage_through_day: float = 0
@@ -148,18 +179,16 @@ var _middle_of_night_end: GameTime
 var _queued_day_config: DayConfig = null
 var _queued_day_config_overwrite: bool = false
 var _queued_scheduler: DayScheduler = null
-
 var _yesterday: DayConfig
-
 var _is_day: bool = false
 
 func _ready() -> void:
+	if default_day_config == null:
+		assert(default_day_config != null, "No default day config set! A default day config is required for the day night cycle to work!")
+
 	# TODO cleanup ready func
 	if show_debug_info:
 		on_day_period_overwrite.subscribe(func(information: Dictionary): print("Day Period Overwriten. Old period: " + information.get("old_period").period_name + " - New period: " + information.get("new_period").period_name)).dispose_with(self)
-	if default_day_config == null:
-		push_error("No default day config set!")
-		get_tree().quit()
 
 	GameTime.DAYS_IN_YEAR = days_in_year
 	GameTime.YEAR_DIVISOR = GameTime.DAYS_IN_YEAR * GameTime.DAY_DIVISOR
@@ -199,18 +228,17 @@ func _ready() -> void:
 	else:
 		_has_day_periods = false
 
-func clear_console(num):
-	for i in range(num):
-		print("")
-
-func _process(delta: float):
+func _process(delta: float) -> void:
 	if not _time_stopped:
 		_percentage_through_day += (delta / day_lenth_in_seconds) * _time_speed_multiplier;
-		_send_potential_reminders()
-		# Needs to make sure the percentage never goes over 1, so handle day end first
-		if _percentage_through_day >= 1:
+		# Needs to make sure the percentage never goes over _FULL_DAY_PERCENTAGE, so handle day end first
+		if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
 			handle_day_end();
+	elif not should_calculate_when_paused:
+		return
+
 	_game_time_this_frame = _calculate_game_time_for_frame()
+	_send_potential_reminders()
 	_handle_time_speed()
 	_update_day_state()
 
@@ -221,46 +249,62 @@ func _process(delta: float):
 	if environment != null:
 		environment.environment.ambient_light_energy = calculate_light_intesity() if !_is_day else 0
 
-func _handle_time_speed():
-	if (_time_to_stop_multiplier != null) && (_game_time_this_frame.is_after_or_same(_time_to_stop_multiplier)):
-		_time_to_stop_multiplier = null
-		_on_time_speed_end.on_next(_game_time_this_frame)
-		alter_time_speed(default_time_speed_multiplier)
-
+## This will queue a [DayConfig] for the next day. Meaning when the day changes, the queued [DayConfig] will be used.
+## If [param overwrite_day] is [code]true[/code] then the queued [DayConfig] will take the place of the next day's [DayConfig]
+## If [param overwrite_day] is [code]false[/code] (default behavior) then the queued [DayConfig] will push what would be the next [DayConfig] to be the the day after the queued [DayConfig].
 func queue_day_config(config: DayConfig, overwrite_day: bool = false) -> void:
 	_queued_day_config_overwrite = overwrite_day
 	_queued_day_config = config
 
+## Returns [code]true[/code] if there is a queued day config, [code]false[/code] otherwise
 func has_queued_day_config() -> bool:
 	return _queued_day_config != null
 
+## Removes the queued [DayConfig]. Does nothing if there is no queued [DayConfig]
 func remove_queued_day_config() -> void:
 	if !has_queued_day_config():
 		return
 	_queued_day_config = null
-	pass
 
+## This will queue a [DayScheduler] to be used after the current [DayScheduler] is done.
+## If there is not already a current [DayScheduler] then this will set the [DayScheduler] immediately
 func queue_scheduler(scheduler: DayScheduler) -> void:
+	if day_scheduler == null:
+		set_new_scheduler(scheduler)
+		return
 	_queued_scheduler = scheduler
 
+## Returns [code]true[/code] if there is a queued [DayScheduler], [code]false[/code] otherwise
 func has_queued_scheduler() -> bool:
 	return _queued_scheduler != null
 
+## Removes the queued [DayScheduler]. Does nothing if there is no queued [DayScheduler]
 func remove_queued_scheduler() -> void:
 	if !has_queued_scheduler():
 		return
 	_queued_scheduler = null
 
+## Returns the current [DayScheduler]
 func get_current_scheduler() -> DayScheduler:
 	return day_scheduler
+
+## Returns the current [DayConfig]
 func get_current_day_config() -> DayConfig:
 	return _day_config
 
+## Returns [code]true[/code] if it is day time, [code]false[/code] if it is in night time.
+## This is based on the current [GameTime] in relation to the current [DayConfig]
 func is_day() -> bool:
 	return _is_day
+
+## Returns [code]true[/code] if it is night time, [code]false[/code] if it is in day time.
+## This is based on the current [GameTime] in relation to the current [DayConfig]
 func is_night() -> bool:
 	return !_is_day
 
+## Sets the current [DayPeriodConfig] to be active immediately for the length of [param length_of_period_in_seconds] seconds
+## The start time of this period will be set to the current [GameTime]
+## The [param length_of_period_in_seconds] is how many [GameTime] seconds the period should last
 func set_day_period(period: DayPeriodConfig, length_of_period_in_seconds: int) -> void:
 	period.start_hour = _game_time_this_frame.get_hour()
 	period.start_minute = _game_time_this_frame.get_minute()
@@ -276,7 +320,13 @@ func set_day_period(period: DayPeriodConfig, length_of_period_in_seconds: int) -
 
 	_set_active_period(period)
 
-	
+## Returns a dictionary of times that are milestones. This includes
+## [code]sunset_yesterday[/code] - the [GameTime] of yesterday's sunset
+## [code]start_of_day[/code] - the [GameTime] of the start of the current day
+## [code]sunrise_today[/code] - the [GameTime] of today's sunrise
+## [code]sunset_today[/code] - the [GameTime] of today's sunset
+## [code]end_of_day[/code] - the [GameTime] of the end of the current day
+## [code]sunrise_tomorrow[/code] - the [GameTime] of tomorrow's sunrise
 func get_milestone_times() -> Dictionary:
 	return {
 		"sunset_yesterday": _sunset_yesterday,
@@ -424,8 +474,7 @@ func set_time(time: GameTime) -> void:
 		if day_scheduler != null:
 			set_day_config(day_scheduler.advance_and_get_day_config())
 			if day_scheduler.is_done():
-				_on_day_scheduler_finish.on_next(day_scheduler)
-				day_scheduler = null
+				_end_current_scheduler()
 		else:
 			set_day_config(default_day_config)
 
@@ -674,7 +723,9 @@ func alter_time_speed(time_multiplier: float, time_to_stop_at: GameTime = null)-
 	_on_time_speed_change.on_next(time_multiplier)
 	_time_speed_multiplier = time_multiplier
 
-func reset_default_time_speed() -> void:
+func reset_default_time_speed(should_fire_time_speed_end_event: bool = false) -> void:
+	if should_fire_time_speed_end_event:
+		_on_time_speed_end.on_next(_game_time_this_frame)
 	alter_time_speed(default_time_speed_multiplier)
 
 func _populate_reminders(time: GameTime) -> void:
@@ -738,24 +789,25 @@ func _get_light_intensity_percentage() -> float:
 		if _game_time_this_frame.is_before(_sunrise_today):
 			# We transitioned to night after midnight, se we should use yesterdays values
 			if _game_time_this_frame.is_before(_middle_of_night_begin):
-				return GameTime.percent_between(_game_time_this_frame, _sunset_yesterday, _middle_of_night_begin, "am,bm")
+				return GameTime.percent_between(_game_time_this_frame, _sunset_yesterday, _middle_of_night_begin)
 			else:
-				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_begin, _sunset_today, "am,am")
+				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_begin, _sunset_today)
 		else:
 			# We are night before midnight, so we should use todays values
 			if _game_time_this_frame.is_before(_middle_of_night_end):
-				return GameTime.percent_between(_game_time_this_frame, _sunset_today, _middle_of_night_end, str(_day_config.get_sunrise_time().get_hour())+"-"+str(_game_time_this_frame.get_hour()) + "-" + str(_is_day))
+				return GameTime.percent_between(_game_time_this_frame, _sunset_today, _middle_of_night_end)
 			else:
-				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_end, _sunrise_tomorrow, "bm,am")
+				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_end, _sunrise_tomorrow)
 
 func _set_active_period(period: DayPeriodConfig) -> void:
-	_on_day_period_start.on_next(period)
 	_color_lerp_time = 0
 	if _active_period != null:
 		if _active_weather != null:
 			_end_active_weather()
 		_on_day_period_overwrite.on_next({"old_period": _active_period, "new_period": _day_config.day_periods[_day_period_index]})
 	_active_period = period
+	_on_day_period_start.on_next(period)
+
 	if _active_period.has_weather():
 		var possible_weather: WeatherConfig = _active_period.pick_weather()
 		if (possible_weather != null) && possible_weather.should_trigger():
@@ -766,18 +818,21 @@ func _set_active_period(period: DayPeriodConfig) -> void:
 func _end_active_period() -> void:
 	if _active_weather != null:
 		_end_active_weather()
-	_on_day_period_end.on_next(_active_period)
+	var old_period: DayPeriodConfig = _active_period
 	_active_period = null
+	_on_day_period_end.on_next(old_period)
 	_color_lerp_time = 0
 
 ## This assumes that there is active weather
 func _end_active_weather() -> void:
-	_on_weather_end.on_next(_active_weather)
+	var old_weather: WeatherConfig = _active_weather
 	_active_weather = null
+	_on_weather_end.on_next(old_weather)
 
 func _end_current_scheduler() -> void:
-	_on_day_scheduler_finish.on_next(day_scheduler)
+	var old_scheduler: DayScheduler = day_scheduler
 	day_scheduler = null
+	_on_day_scheduler_finish.on_next(old_scheduler)
 
 func _calculate_percent_of_day_by_time(time: GameTime) -> float:
 	var milliseconds_passed: int = time.get_epoch() - _current_date_at_start_of_day.get_epoch()
@@ -789,3 +844,8 @@ func _calculate_percent_of_day_by_time(time: GameTime) -> float:
 func _calculate_game_time_for_frame() -> GameTime:
 	var milliseconds_so_far: int = _percentage_through_day * GameTime.MILLISECONDS_IN_DAY
 	return GameTime.new(_current_date_at_start_of_day.get_epoch() + milliseconds_so_far)
+
+func _handle_time_speed():
+	if (_time_to_stop_multiplier != null) && (_game_time_this_frame.is_after_or_same(_time_to_stop_multiplier)):
+		_time_to_stop_multiplier = null
+		reset_default_time_speed(true)

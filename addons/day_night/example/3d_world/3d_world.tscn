@@ -43,13 +43,13 @@ mesh = SubResource("SphereMesh_kmr42")
 
 [node name="DayNightCycle" type="Node" parent="." node_paths=PackedStringArray("sun", "environment")]
 script = ExtResource("1_fe7bq")
+default_day_config = ExtResource("2_kh4i3")
 sun = NodePath("../Sun")
 environment = NodePath("../WorldEnvironment")
-day_lenth_in_seconds = 600
+day_scheduler = ExtResource("3_xcuvk")
+day_lenth_in_seconds = 30
 days_in_year = 4
 start_hour = 3
-day_scheduler = ExtResource("3_xcuvk")
-default_day_config = ExtResource("2_kh4i3")
 
 [node name="Date" type="Label" parent="."]
 offset_right = 358.0
