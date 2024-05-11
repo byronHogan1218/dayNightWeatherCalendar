@@ -233,7 +233,7 @@ func _process(delta: float) -> void:
 		_percentage_through_day += (delta / day_lenth_in_seconds) * _time_speed_multiplier;
 		# Needs to make sure the percentage never goes over _FULL_DAY_PERCENTAGE, so handle day end first
 		if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
-			handle_day_end();
+			_handle_day_end();
 	elif not should_calculate_when_paused:
 		return
 
@@ -337,123 +337,50 @@ func get_milestone_times() -> Dictionary:
 		"sunrise_tomorrow": _sunrise_tomorrow
 	}
 
-
-func handle_day_end():
-	_yesterday = _day_config
-	var old_start_of_date = GameTime.new(_current_date_at_start_of_day.get_epoch())
-	_current_date_at_start_of_day = _current_date_at_start_of_day.add_unit(1, TimeUnit.DAY)
-	_current_date_at_end_of_day = GameTime.create_from_instant(Instant.new(
-		_current_date_at_start_of_day.get_year(),
-		_current_date_at_start_of_day.get_day(),
-		23,
-		59,
-		59,
-		999
-	))
-	_day_period_index = 0
-	if(day_scheduler != null):
-		if has_queued_day_config():
-			set_day_config(_queued_day_config)
-			remove_queued_day_config()
-			if _queued_day_config_overwrite && !day_scheduler.is_done():
-				day_scheduler.advance_day_config()
-		else:
-			set_day_config(day_scheduler.advance_and_get_day_config())
-		if day_scheduler.is_done():
-			_end_current_scheduler()
-			if has_queued_scheduler():
-				set_new_scheduler(_queued_scheduler)
-				remove_queued_scheduler()
-	else:
-		if has_queued_day_config():
-			set_day_config(_queued_day_config)
-			remove_queued_day_config()
-		elif _day_config.get_instance_id() != default_day_config.get_instance_id():
-			set_day_config(default_day_config)
-
-	_queued_day_config_overwrite = false
-	if (_day_config != null) && (_day_config.day_periods != null):
-		_has_day_periods = true
-		_day_config.day_periods.sort_custom(func(a, b): return a.start_time < b.start_time)
-	else:
-		_has_day_periods = false
-
-	_percentage_through_day -= _FULL_DAY_PERCENTAGE
-	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunrise()))
-	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunset()))
-
-	_game_time_this_frame = _calculate_game_time_for_frame()
-	_calculate_milestone_times()
-	_on_day_change.on_next(_current_date_at_start_of_day)
-	if not _current_date_at_start_of_day.is_same_unit(old_start_of_date, TimeUnit.YEARS):
-		_on_year_change.on_next(_current_date_at_start_of_day)
-	if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
-		handle_day_end()
-
+## This pauses the passage of time. If the time has not already been paused, this will emit [code]on_time_paused[/code]
 func stop_time() -> void:
 	if !_time_stopped:
 		_on_time_paused.on_next(_time_stopped)
 	_time_stopped = true
 
-
+## This resumes the passage of time. If the time has already been paused, this will emit [code]on_time_resumed[/code]
 func start_time() -> void:
 	if _time_stopped:
 		_on_time_resumed.on_next(_time_stopped)
 	_time_stopped = false
 
+## This will overwrite the current [DayConfig] with the [param config]. If the [param config] is the same as the current [DayConfig] then this will do nothing.
+## If the [DayConfig] is successfully set then this will emit [code]on_day_config_change[/code]
 func set_day_config(config: DayConfig) -> void:
+	if config == null:
+		return
 	if (_day_config != null) && (config.get_instance_id() == _day_config.get_instance_id()):
 		return
 	_color_lerp_time = 0
 	_day_config = config
 	_on_day_config_change.on_next(_day_config)
 
+## This will overwrite the current [DayScheduler] with the [param scheduler]. If the [param scheduler] is the same as the current [DayScheduler] then this will do nothing.
+## If the [DayScheduler] is successfully set then this will emit [code]on_day_scheduler_change[/code]
+## If [param overwrite_day_config] is [code]true[/code] then this will also overwrite the current [DayConfig] with the [param scheduler]'s current [DayConfig]
 func set_new_scheduler(scheduler: DayScheduler, overwrite_day_config: bool = false) -> void:
+	if scheduler == null:
+		return
+	if (day_scheduler != null) && (scheduler.get_instance_id() == day_scheduler.get_instance_id()):
+		return
+	day_scheduler.verify()
 	day_scheduler = scheduler
 	_on_day_scheduler_change.on_next(day_scheduler)
 	if overwrite_day_config:
 		set_day_config(day_scheduler.get_current_day_config())
 
-func _calculate_milestone_times() -> void:
-	if day_scheduler != null:
-		var yesterday_sunset: GameTime
-		if _yesterday != null:
-			yesterday_sunset = _yesterday.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
-		else:
-			if day_scheduler.should_repeat:
-				yesterday_sunset = day_scheduler.get_previous_day_config().get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
-			else:
-				# We default to the default day config is the scheduler does not repeat
-				yesterday_sunset = default_day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
-		var tomorrow_sunrise: GameTime
-		if day_scheduler.is_done():
-			# We default to the default day config if the scheduler is done
-			tomorrow_sunrise = default_day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
-		else:
-			tomorrow_sunrise = day_scheduler.get_next_day_config().get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
-		_sunset_yesterday = yesterday_sunset
-		_sunrise_tomorrow = tomorrow_sunrise
-		_sunrise_today = day_scheduler.get_current_day_config().get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
-		_sunset_today = day_scheduler.get_current_day_config().get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
-		_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
-		_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
-		_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
-		return
-	# We need to calculate based off of the set day config
-	var yesterday_sunset: GameTime
-	if _yesterday != null:
-		yesterday_sunset = _yesterday.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
-	else:
-		yesterday_sunset = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
-	_sunset_yesterday = yesterday_sunset
-	_sunrise_tomorrow = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
-	_sunrise_today = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
-	_sunset_today = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
-	_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
-	_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
-	_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
-
-func set_time(time: GameTime) -> void:
+## Overwrites the current [GameTime] with the [param time].
+## [param new_day_config] and [param new_scheduler] are optional values
+## If [param new_day_config] is provided, it will set the current [DayConfig] to that value
+## If [param new_scheduler] is provided, it will set the current [DayScheduler] to that value
+## If both [param new_day_config] and [param new_scheduler] are provided, it will set the current [DayConfig] to [param new_day_config] and [DayScheduler] will take effect the next day
+## This will not emit any events except for [code]on_day_config_change[/code] and [code]on_day_scheduler_change[/code] if they are different from the respective current values are.
+func set_time(time: GameTime, new_day_config: DayConfig = null, new_scheduler: DayScheduler = null) -> void:
 	_current_date_at_start_of_day = GameTime.create_from_instant(Instant.new(
 		time.get_year(),
 		time.get_day(),
@@ -470,9 +397,15 @@ func set_time(time: GameTime) -> void:
 		59,
 		999
 	))
+	if new_day_config != null:
+		set_day_config(new_day_config)
+	if new_scheduler != null:
+		set_new_scheduler(new_scheduler)
 	if _day_config == null:
 		if day_scheduler != null:
-			set_day_config(day_scheduler.advance_and_get_day_config())
+			day_scheduler.verify()
+			if day_scheduler.get_current_index() < 0:
+				set_day_config(day_scheduler.advance_and_get_day_config())
 			if day_scheduler.is_done():
 				_end_current_scheduler()
 		else:
@@ -500,13 +433,16 @@ func set_time(time: GameTime) -> void:
 	if environment != null:
 		environment.environment.ambient_light_energy = calculate_light_intesity() if !_is_day else 0
 
-## THIS IS A COMMENT
+## Returns the current [GameTime]
 func get_time_this_frame() -> GameTime:
 	return _game_time_this_frame
 
+## Returns the current time speed multiplier
 func get_time_speed_multiplier() -> float:
 	return _time_speed_multiplier
 
+## Returns the calculated light color for the current frame
+## This is used automatically if the sun/environment is provided to set the color
 func get_light_color(delta: float, immediate: bool = false) -> Color:
 	if (_color_lerp_time > 1):
 		return sun.get_color();
@@ -525,7 +461,8 @@ func get_light_color(delta: float, immediate: bool = false) -> Color:
 	else:
 		return lerp(sun.get_color(), new_color, _color_lerp_time) as Color
 
-
+## Returns the calculated light intensity for the current frame
+## This is used automatically if the sun/environment is provided to set the light intensity
 func calculate_light_intesity() -> float:
 	var intensity: float
 	var min_intensity: float
@@ -540,7 +477,8 @@ func calculate_light_intesity() -> float:
 		min_intensity = _day_config.minimum_light_intensity
 	return clampf(intensity * _get_light_intensity_percentage(), min_intensity, _MAX_LIGHT_INTENSITY_POSSIBLE)
 
-
+## Returns the current sun rotation in degrees for the current frame
+## This is used automatically if the sun/environment is provided
 func get_sun_rotation() -> Vector3:
 	var angle: float
 
@@ -566,11 +504,16 @@ func get_sun_rotation() -> Vector3:
 
 	return Vector3(angle+ 180,0, 0)
 
+## Returns [code]true[/code] if it is night time but before midnight, [code]false[/code] if it is day time or night time after midnight
 func is_night_before_midnight() -> bool:
 	if is_day():
 		return false
 	return _percentage_through_day >= _sunset_start_percentage
 
+## Returns a dictionary of the current reminders. This does not include any reminder before the current [GameTime]
+## Because subscriptions to reminders are not persisted, they will be lost if the game/scene is closed and re-opened
+## This will give a list of the current reminders in order to resubscribe to them upon re-opening the game/scene
+## In order to restore the state, call [method create_reminders] with the normal reminders and the repeating reminders values from this dictionary
 func save_reminders() -> Dictionary:
 	var reminders: Array[Variant] = []
 	for reminder in _reminders.values():
@@ -580,12 +523,15 @@ func save_reminders() -> Dictionary:
 	for reminder in _repeating_reminders.values():
 		if reminder.time.is_after_or_same(_game_time_this_frame, TimeUnit.DAYS):
 			repeating_reminders.append({"time":reminder.time.get_epoch(), "name":reminder.name})
-
 	return {
 		"reminders": reminders,
 		"repeating_reminders": repeating_reminders,
 	}
 
+## Returns the current state of the [DayNightCycle] as a JSON string.
+## [b]THIS DOES NOT INCLUDE REMINDERS.[/b]
+## Use [method save_reminders] to save reminders as they need to be re-subscribed to and that cannot be done automatically
+## [br]The JSON formatted [String] can be used by the [method load_from_json] in order to restore the state of the [DayNightCycle]
 func save() -> String:
 	var save_object: Dictionary = {
 		"game_version": _GAME_VERSION,
@@ -606,7 +552,12 @@ func save() -> String:
 	}
 	return JSON.stringify(save_object)
 
-func load(data_string: String) -> bool:
+## Loads the state of the [DayNightCycle] from a JSON formatted [String] created by the [method save] function.
+## This will not restore the state of the reminders.
+## This will error if the JSON is invalid
+## This could potentially error if the [code]game_version[/code] or [code]plugin_version[/code] in the JSON is invalid/does not match
+## Returns [code]true[/code] if successful, [code]false[/code] if not
+func load_from_json(data_string: String) -> bool:
 	var data = JSON.parse_string(data_string)
 	if not data is Dictionary:
 		push_error("Invalid data type parsed from JSON! Expected: Dictionary - Got: " + str(typeof(data)))
@@ -614,7 +565,7 @@ func load(data_string: String) -> bool:
 	if data.get("game_version", "unknown") != _GAME_VERSION:
 		push_error("Invalid game version! Expected: " + str(_GAME_VERSION) + " - Got: " + str(data.get("game_version", "unknown")))
 		return false
-	if data.get("pugin_version", "unknown") != _PLUGIN_VERSION:
+	if data.get("plugin_version", "unknown") != _PLUGIN_VERSION:
 		push_error("Invalid game version! Expected: " + str(_PLUGIN_VERSION) + " - Got: " + str(data.get("plugin_version", "unknown")))
 		return false
 	_game_time_this_frame = GameTime.new(data.get("current_time", 0))
@@ -849,3 +800,94 @@ func _handle_time_speed():
 	if (_time_to_stop_multiplier != null) && (_game_time_this_frame.is_after_or_same(_time_to_stop_multiplier)):
 		_time_to_stop_multiplier = null
 		reset_default_time_speed(true)
+
+func _handle_day_end():
+	_yesterday = _day_config
+	var old_start_of_date = GameTime.new(_current_date_at_start_of_day.get_epoch())
+	_current_date_at_start_of_day = _current_date_at_start_of_day.add_unit(1, TimeUnit.DAY)
+	_current_date_at_end_of_day = GameTime.create_from_instant(Instant.new(
+		_current_date_at_start_of_day.get_year(),
+		_current_date_at_start_of_day.get_day(),
+		23,
+		59,
+		59,
+		999
+	))
+	_day_period_index = 0
+	if(day_scheduler != null):
+		if has_queued_day_config():
+			set_day_config(_queued_day_config)
+			remove_queued_day_config()
+			if _queued_day_config_overwrite && !day_scheduler.is_done():
+				day_scheduler.advance_day_config()
+		else:
+			set_day_config(day_scheduler.advance_and_get_day_config())
+		if day_scheduler.is_done():
+			_end_current_scheduler()
+			if has_queued_scheduler():
+				set_new_scheduler(_queued_scheduler)
+				remove_queued_scheduler()
+	else:
+		if has_queued_day_config():
+			set_day_config(_queued_day_config)
+			remove_queued_day_config()
+		elif _day_config.get_instance_id() != default_day_config.get_instance_id():
+			set_day_config(default_day_config)
+
+	_queued_day_config_overwrite = false
+	if (_day_config != null) && (_day_config.day_periods != null):
+		_has_day_periods = true
+		_day_config.day_periods.sort_custom(func(a, b): return a.start_time < b.start_time)
+	else:
+		_has_day_periods = false
+
+	_percentage_through_day -= _FULL_DAY_PERCENTAGE
+	_sunrise_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunrise()))
+	_sunset_start_percentage = _calculate_percent_of_day_by_time(GameTime.create_from_instant(_day_config.get_sunset()))
+
+	_game_time_this_frame = _calculate_game_time_for_frame()
+	_calculate_milestone_times()
+	_on_day_change.on_next(_current_date_at_start_of_day)
+	if not _current_date_at_start_of_day.is_same_unit(old_start_of_date, TimeUnit.YEARS):
+		_on_year_change.on_next(_current_date_at_start_of_day)
+	if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
+		_handle_day_end()
+
+func _calculate_milestone_times() -> void:
+	if day_scheduler != null:
+		var yesterday_sunset: GameTime
+		if _yesterday != null:
+			yesterday_sunset = _yesterday.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+		else:
+			if day_scheduler.should_repeat:
+				yesterday_sunset = day_scheduler.get_previous_day_config().get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+			else:
+				# We default to the default day config is the scheduler does not repeat
+				yesterday_sunset = default_day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+		var tomorrow_sunrise: GameTime
+		if day_scheduler.is_done():
+			# We default to the default day config if the scheduler is done
+			tomorrow_sunrise = default_day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
+		else:
+			tomorrow_sunrise = day_scheduler.get_next_day_config().get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
+		_sunset_yesterday = yesterday_sunset
+		_sunrise_tomorrow = tomorrow_sunrise
+		_sunrise_today = day_scheduler.get_current_day_config().get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
+		_sunset_today = day_scheduler.get_current_day_config().get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
+		_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
+		_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
+		_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
+		return
+	# We need to calculate based off of the set day config
+	var yesterday_sunset: GameTime
+	if _yesterday != null:
+		yesterday_sunset = _yesterday.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+	else:
+		yesterday_sunset = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).subtract_unit(1, TimeUnit.DAY)
+	_sunset_yesterday = yesterday_sunset
+	_sunrise_tomorrow = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true).add_unit(1, TimeUnit.DAY)
+	_sunrise_today = _day_config.get_sunrise_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
+	_sunset_today = _day_config.get_sunset_time().set_unit(_game_time_this_frame.get_year(), TimeUnit.YEAR, true).set_unit(_game_time_this_frame.get_day(), TimeUnit.DAY, true)
+	_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
+	_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
+	_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)

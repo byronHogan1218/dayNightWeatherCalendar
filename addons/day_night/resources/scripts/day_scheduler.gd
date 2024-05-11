@@ -14,8 +14,14 @@ class_name DayScheduler
 @export_enum("In Order", "Random In Order","Weighted Random Pick", "Random Pick") var selection_type: String = "In Order"
 @export var day_configs: Array[DayConfig] = []
 
+func _ready() -> void:
+	verify()
+
 var _index: int = -1
 var _ordered_config_indexes: Array[int] = []
+
+func verify() -> void:
+	assert(day_configs.size() > 0, "At least one day config is required in a scheduler!")
 
 func is_done() -> bool:
 	if should_repeat:
