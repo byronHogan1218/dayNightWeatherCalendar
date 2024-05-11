@@ -590,6 +590,8 @@ func load_from_json(data_string: String) -> bool:
 	set_time(_game_time_this_frame)
 	return true
 
+## This will remove a reminder at the specified [param time] and optionally the [param name]
+## If [param name] is not specified, all reminders at that time will be removed
 func remove_reminder(time: GameTime, name: String = "") -> void:
 	if _reminders.has(time.get_date_as_string()):
 		if (name != "") && _reminders.get(time.get_date_as_string()).name == name:
@@ -598,8 +600,14 @@ func remove_reminder(time: GameTime, name: String = "") -> void:
 		if (name != "") && _repeating_reminders.get(time.get_date_as_string()).name == name:
 			_repeating_reminders.erase(time.get_date_as_string())
 
+
 	# If the reminder is for today, we need to remove it from the list of reminders for today
 	if time.is_today(_game_time_this_frame):
+		## If the time is for today, that means we have already populated the repeating reminder to tomorrow. It needs to be removed
+		var tomorrow_time: GameTime = time.add_unit(1, TimeUnit.DAY)
+		if _repeating_reminders.has(tomorrow_time.get_date_as_string()):
+			if (name != "") && _repeating_reminders.get(tomorrow_time.get_date_as_string()).name == name:
+				_repeating_reminders.erase(tomorrow_time.get_date_as_string())
 		var new_reminders: Array = []
 		for reminder in _todays_reminders:
 			if !reminder.time.is_same_time(time):
@@ -607,35 +615,61 @@ func remove_reminder(time: GameTime, name: String = "") -> void:
 		_todays_reminders = new_reminders
 		_reset_reminders_for_today()
 
-func _reset_reminders_for_today() -> void:
-	_reminder_index = 0
-	if _todays_reminders.size() <= 0:
-		return
-	_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
-	while _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
-		_reminder_index += 1
+## This will remove all reminders with the given [param name].
+## This is not an optimal way of removing reminders as it goes through every reminder to check its name (including reminders in the past).
+## And it recalculates today's reminders as it cannot be sure that those reminders remain unchanged.
+## Please use [method remove_reminder] instead as that specifies a key that allows removing reminders to be more efficient.
+## But this is useful if you just want to remove all reminders with a specific [param name].
+func remove_reminder_by_name(name: String) -> void:
+	for key in _reminders:
+		var value = _reminders[key]
+		if value.name == name:
+			_reminders.erase(key)
+	for key in _repeating_reminders:
+		var value = _repeating_reminders[key]
+		if value.name == name:
+			_repeating_reminders.erase(key)
+	var new_reminders: Array = []
+	for value in _todays_reminders:
+		if value.name != name:
+			new_reminders.append(value)
+	_todays_reminders = new_reminders
+	_reset_reminders_for_today()
 
-func remove_current_scheduler() -> void:
+## Removes the current [DayScheduler] if it is set.
+## If [param remove_day_config] is true, it will also remove the current [DayConfig]
+## If [param remove_day_config] is false, it will keep the current [DayConfig] which will be changed on the next day change
+func remove_current_scheduler(remove_day_config: bool = false) -> void:
 	if day_scheduler == null:
 		return
+	if remove_day_config:
+		remove_current_day_config()
 	_end_current_scheduler()
 
+## Sets the current [DayConfig] to the [DayNightCycle] default day config. See [method set_current_day_config] if you would like to change the current [DayConfig] to a different one.
+## The the current [DayConfig] is the default [DayConfig], nothing will happen
 func remove_current_day_config() -> void:
 	if _day_config.get_instance_id() == default_day_config.get_instance_id():
 		return
 	_day_config = default_day_config
 	_on_day_config_change.on_next(_day_config)
 
+## Removes the current [DayPeriodConfig] if it is set.
 func remove_current_day_period() -> void:
 	if _active_period == null:
 		return
 	_end_active_period()
 
+## Removes the current [WeatherConfig] if it is set. This does not change the the current [DayPeriodConfig].
+## See [method remove_current_day_period] if you would like to end the current [DayPeriodConfig]
 func remove_current_weather() -> void:
 	if _active_weather == null:
 		return
 	_end_active_weather()
 
+## Creates a reminder at the specified [param time] with the specified [param name].
+## If [param repeating] is true, it will create a repeating reminder, which will repeat every day at the specified [param time].
+## This returns an [Observable] that emits when the reminder is triggered.
 func create_reminder(time: GameTime,name: String, repeating: bool = false) -> Observable:
 	var observable: Subject = Subject.new()
 	if repeating:
@@ -659,6 +693,11 @@ func create_reminder(time: GameTime,name: String, repeating: bool = false) -> Ob
 
 	return observable.as_observable()
 
+## Changes the time speed multiplier to the specified [param time_multiplier].
+## If [param time_multiplier] is less than 0.1, it will log an error and not change the time speed
+## If [param time_multiplier] is greater than the [DayNightCycle] constant _MAX_TIME_MULTIPLIER, it will log an error and not change the time speed
+## If [param time_to_stop_at] is specified, the time speed multiplier will be reset to the default time speed on the first tick past the specified [param time_to_stop_at]
+## If [param time_to_stop_at] is specified and the time is before the current [GameTime], it will log an error and not change the time speed
 func alter_time_speed(time_multiplier: float, time_to_stop_at: GameTime = null)-> void:
 	if time_multiplier < 0.1:
 		push_error("Invalid time multiplier: " + str(time_multiplier))
@@ -674,11 +713,14 @@ func alter_time_speed(time_multiplier: float, time_to_stop_at: GameTime = null)-
 	_on_time_speed_change.on_next(time_multiplier)
 	_time_speed_multiplier = time_multiplier
 
+## Resets the time speed multiplier to the default
+## If [param should_fire_time_speed_end_event] is [code]true[/code], it will fire the time speed end event
 func reset_default_time_speed(should_fire_time_speed_end_event: bool = false) -> void:
 	if should_fire_time_speed_end_event:
 		_on_time_speed_end.on_next(_game_time_this_frame)
 	alter_time_speed(default_time_speed_multiplier)
 
+## Sorts and sets todays reminders
 func _populate_reminders(time: GameTime) -> void:
 	_todays_reminders.clear()
 	_reminder_index=0
@@ -694,12 +736,14 @@ func _populate_reminders(time: GameTime) -> void:
 			_repeating_reminders[new_time.get_date_as_string()].append({"observable": reminder.observable, "time": new_time, "name": reminder.name})
 	_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
 
+## Will emit any potential reminder fo rthis frame
 func _send_potential_reminders() -> void:
 	if (_todays_reminders.size() > 0) and (_reminder_index < _todays_reminders.size()):
 		if _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
 			_todays_reminders[_reminder_index].observable.on_next(_todays_reminders[_reminder_index].name)
 			_reminder_index += 1
 
+## Will update the day state as to whether it is day or night. In addition, will update if we are in a [DayPeriodConfig] or have left one
 func _update_day_state():
 	if (_percentage_through_day < _sunset_start_percentage) && (_percentage_through_day > _sunrise_start_percentage):
 		if not _is_day:
@@ -730,6 +774,7 @@ func _update_day_state():
 		if _game_time_this_frame.is_after_or_same(_active_period.get_end_time(_game_time_this_frame.get_year(), _game_time_this_frame.get_day())):
 			_end_active_period()
 
+## Returns the percentage of that the light intensity should be in relation to its peak intensity at the current time
 func _get_light_intensity_percentage() -> float:
 	if _is_day:
 		if _game_time_this_frame.is_before(_middle_of_day_time):
@@ -750,6 +795,7 @@ func _get_light_intensity_percentage() -> float:
 			else:
 				return GameTime.inverted_percent_between(_game_time_this_frame, _middle_of_night_end, _sunrise_tomorrow)
 
+## Sets the active period to the [param period].
 func _set_active_period(period: DayPeriodConfig) -> void:
 	_color_lerp_time = 0
 	if _active_period != null:
@@ -765,7 +811,8 @@ func _set_active_period(period: DayPeriodConfig) -> void:
 			_active_weather = possible_weather
 			_on_weather_start.on_next(_active_weather)
 
-## This assumes that there is an active period
+## This will end the active period
+## This assumes that there is an active period to avoid double checking the same thing
 func _end_active_period() -> void:
 	if _active_weather != null:
 		_end_active_weather()
@@ -774,17 +821,21 @@ func _end_active_period() -> void:
 	_on_day_period_end.on_next(old_period)
 	_color_lerp_time = 0
 
-## This assumes that there is active weather
+## This will end the active weather
+## This assumes that there is active weather to avoid double checking the same thing
 func _end_active_weather() -> void:
 	var old_weather: WeatherConfig = _active_weather
 	_active_weather = null
 	_on_weather_end.on_next(old_weather)
 
+## This will end the active scheduler
+## This assumes that there is an active scheduler to avoid double checking the same thing
 func _end_current_scheduler() -> void:
 	var old_scheduler: DayScheduler = day_scheduler
 	day_scheduler = null
 	_on_day_scheduler_finish.on_next(old_scheduler)
 
+## Returns the percentage of progress through the current day (midnight to midnight)
 func _calculate_percent_of_day_by_time(time: GameTime) -> float:
 	var milliseconds_passed: int = time.get_epoch() - _current_date_at_start_of_day.get_epoch()
 	var percentage: float = float(milliseconds_passed) / float(GameTime.MILLISECONDS_IN_DAY)
@@ -792,15 +843,18 @@ func _calculate_percent_of_day_by_time(time: GameTime) -> float:
 		percentage = 1 + percentage
 	return percentage
 
+## Returns the [GameTime] representation for the current frame
 func _calculate_game_time_for_frame() -> GameTime:
 	var milliseconds_so_far: int = _percentage_through_day * GameTime.MILLISECONDS_IN_DAY
 	return GameTime.new(_current_date_at_start_of_day.get_epoch() + milliseconds_so_far)
 
+## Handles the time speed ending if the time to stop multiplier is set and
 func _handle_time_speed():
 	if (_time_to_stop_multiplier != null) && (_game_time_this_frame.is_after_or_same(_time_to_stop_multiplier)):
 		_time_to_stop_multiplier = null
 		reset_default_time_speed(true)
 
+## This is called when the day changes to set up the values for the next day
 func _handle_day_end():
 	_yesterday = _day_config
 	var old_start_of_date = GameTime.new(_current_date_at_start_of_day.get_epoch())
@@ -853,6 +907,8 @@ func _handle_day_end():
 	if _percentage_through_day >= _FULL_DAY_PERCENTAGE:
 		_handle_day_end()
 
+## This calculates the milestone times for the current day.
+## These are times that do not change during the day so we don't want to waste effort calulating them every frame
 func _calculate_milestone_times() -> void:
 	if day_scheduler != null:
 		var yesterday_sunset: GameTime
@@ -891,3 +947,12 @@ func _calculate_milestone_times() -> void:
 	_middle_of_day_time = GameTime.new((_sunrise_today.get_epoch() + _sunset_today.get_epoch()) / 2)
 	_middle_of_night_begin = GameTime.new((_sunset_yesterday.get_epoch() + _sunrise_today.get_epoch()) / 2)
 	_middle_of_night_end = GameTime.new((_sunset_today.get_epoch() + _sunrise_tomorrow.get_epoch()) / 2)
+
+## This is called when we create/remove a reminder for today in order to reset the sorting and reminder index
+func _reset_reminders_for_today() -> void:
+	_reminder_index = 0
+	if _todays_reminders.size() <= 0:
+		return
+	_todays_reminders.sort_custom(func(a, b): return a.time.get_epoch() < b.time.get_epoch())
+	while _todays_reminders[_reminder_index].time.is_before(_game_time_this_frame):
+		_reminder_index += 1
