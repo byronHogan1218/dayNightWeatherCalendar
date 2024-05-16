@@ -1,3 +1,4 @@
+@icon("res://addons/day_night/weather-logo.svg")
 extends Resource
 class_name WeatherConfig
 

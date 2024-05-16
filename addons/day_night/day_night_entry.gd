@@ -5,7 +5,7 @@ extends EditorPlugin
 const NODE_NAME: String = "DayNightCycle"
 const INHERITANCE: String = "Node"
 const NODE_SCRIPT: Script = preload("res://addons/day_night/day_night_cycle.gd")
-const NODE_ICON: Texture2D = preload("res://addons/day_night/node_icon.svg")
+const NODE_ICON: Texture2D = preload("res://addons/day_night/sun-logo.svg")
 
 
 func _enter_tree() -> void:

@@ -4,8 +4,8 @@
 
 [resource]
 script = ExtResource("1_weqmr")
-has_night = true
 day_name = ""
+day_weight = 1
 day_color = Color(1, 0, 0, 1)
 day_time_light_intensity = 10.0
 night_color = Color(1, 0, 0, 1)

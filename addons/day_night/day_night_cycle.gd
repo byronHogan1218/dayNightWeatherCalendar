@@ -1,21 +1,28 @@
 extends Node
 class_name DayNightCycle
-## A brief description of the class's role and functionality.
-## TODO: do better here
-##
-## The description of the script, what it can do,
-## and any further detail.
-##
-## @tutorial:            https://the/tutorial1/url.com
-## @tutorial(Tutorial2): https://the/tutorial2/url.com
-## @experimental
+
+## This class is used to manage the day/night cycle. It automatically manages the passage time.
+## Time is measured as a timeline and therefore can be though of as a calendar with days, weeks, months, etc.
+## A point on this timeline is called and [Instant]. And instand can be manipulated by converting it to a [GameTime].
+## The amount of time inbetween two [Instant]'s is a [Duration].
+## [br][br]With these simple rules, this Node allows you to schedule events on the timeline. Craft different types of days
+## using [DayConfig] with different effects during that day represented by [DayPeriodConfig]. Each [DayPeriodConfig] can potentialy
+## have a [WeatherConfig] associated with it.
+## [br]For example, you could create a "Rainy" [DayConfig] with several [DayPeriodConfig]s to make the day seem more dark during those periods. Then each of those periods could
+## have a chance of triggering a [WeatherConfig] that starts some sort of [Script] to spawn in rain.
+## You can then schedule those [DayConfig]s using the [DayScheduler] which gives you control over the order or lack thereof of these [DayConfig]s.
+## [br][br]You are required to set a default [DayConfig] before you can use the [DayNightCycle]. This default will be the day that is used whenever no other [DayConfig] is set.
+## [br][br]• You can maniulate the speed in which time passes, or pause and resume it.
+## [br]• You can override,queue,or remove any [DayConfig]s or [DayScheduler]s or [DayPeriodConfig]s.
+## [br]• You can create reminders that will emit when the current game time reaches the reminder [GameTime].
+## [br]• The sun/environment are not required to be set. If they are, this script will control them as well. Or you can manually set them if you would like. The methods to get the color,light intensity, and rotation are also available to be called if you don't want to calculate them yourself.
+## [br]• There are many events that are available to be listened to, see the documentation for more details.
+## [br]• This also exposes a way to save and load the current state of the day night cycle. Please see the [method save] and [method load_from_json] for details on that.
 
 
 # TODO code cleanup, public on top, function docs, DRY
 # TODO make example scenes(have stop time too): saving/loading, no scheduler, warp time, scheduler(all types)
 # TODO Write readme
-# TODO Try 2d
-# TODO Icon for day night node
 # TODO check godot making a plugin for anything missed
 # TODO publish
 
@@ -41,16 +48,17 @@ const _AUTO_COLOR_TRANSTION: float = 100
 ## This is the maximum light intensity that can be set
 const _MAX_LIGHT_INTENSITY_POSSIBLE: float = 16.0
 
-#@export_category("Default Day Config Settings")
 ## REQUIRED, this will be the default day config. It needs to be defined for a fallback day.
 ## This will close the game if it is not set
 @export var default_day_config: DayConfig = null
 
-
 @export_category("Auto Control Settings")
 ## When set, the day night cycle will move and control the light color automatically
 ## This is not required to be set if you want to manually control the light parameters
-@export var sun: DirectionalLight3D
+@export var sun_3d: DirectionalLight3D
+## When set, the day night cycle will move and control the light color automatically
+## This is not required to be set if you want to manually control the light parameters
+@export var sun_2d: DirectionalLight2D
 ## When set, the day night cycle control the ambient light color automatically
 ## This is not required to be set if you want to manually control the light parameters
 @export var environment: WorldEnvironment
@@ -242,15 +250,18 @@ func _process(delta: float) -> void:
 	_handle_time_speed()
 	_update_day_state()
 
-	if sun != null:
-		sun.rotation.x = deg_to_rad(get_sun_rotation().x)
-		sun.set_color(get_light_color(delta))
-		sun.light_energy = calculate_light_intesity() if _is_day else 0.0
+	if sun_3d != null:
+		sun_3d.rotation.x = deg_to_rad(get_sun_rotation().x)
+		sun_3d.set_color(get_light_color(delta))
+		sun_3d.light_energy = calculate_light_intesity() if _is_day else 0.0
+	if sun_2d != null:
+		sun_2d.set_color(get_light_color(delta))
+		sun_2d.energy = calculate_light_intesity() if _is_day else 0.0
 	if environment != null:
 		environment.environment.ambient_light_energy = calculate_light_intesity() if !_is_day else 0
 
 ## This will queue a [DayConfig] for the next day. Meaning when the day changes, the queued [DayConfig] will be used.
-## If [param overwrite_day] is [code]true[/code] then the queued [DayConfig] will take the place of the next day's [DayConfig]
+## If [param overwrite_day] is [code]true[/code] then the queued [DayConfig] will take the place of the next day's [DayConfig].
 ## If [param overwrite_day] is [code]false[/code] (default behavior) then the queued [DayConfig] will push what would be the next [DayConfig] to be the the day after the queued [DayConfig].
 func queue_day_config(config: DayConfig, overwrite_day: bool = false) -> void:
 	_queued_day_config_overwrite = overwrite_day
@@ -293,18 +304,18 @@ func get_current_day_config() -> DayConfig:
 	return _day_config
 
 ## Returns [code]true[/code] if it is day time, [code]false[/code] if it is in night time.
-## This is based on the current [GameTime] in relation to the current [DayConfig]
+## This is based on the current [GameTime] in relation to the current [DayConfig].
 func is_day() -> bool:
 	return _is_day
 
 ## Returns [code]true[/code] if it is night time, [code]false[/code] if it is in day time.
-## This is based on the current [GameTime] in relation to the current [DayConfig]
+## This is based on the current [GameTime] in relation to the current [DayConfig].
 func is_night() -> bool:
 	return !_is_day
 
-## Sets the current [DayPeriodConfig] to be active immediately for the length of [param length_of_period_in_seconds] seconds
-## The start time of this period will be set to the current [GameTime]
-## The [param length_of_period_in_seconds] is how many [GameTime] seconds the period should last
+## Sets the current [DayPeriodConfig] to be active immediately for the length of [param length_of_period_in_seconds] seconds.
+## The start time of this period will be set to the current [GameTime].
+## The [param length_of_period_in_seconds] is how many [GameTime] seconds the period should last.
 func set_day_period(period: DayPeriodConfig, length_of_period_in_seconds: int) -> void:
 	period.start_hour = _game_time_this_frame.get_hour()
 	period.start_minute = _game_time_this_frame.get_minute()
@@ -320,13 +331,13 @@ func set_day_period(period: DayPeriodConfig, length_of_period_in_seconds: int) -
 
 	_set_active_period(period)
 
-## Returns a dictionary of times that are milestones. This includes
-## [code]sunset_yesterday[/code] - the [GameTime] of yesterday's sunset
-## [code]start_of_day[/code] - the [GameTime] of the start of the current day
-## [code]sunrise_today[/code] - the [GameTime] of today's sunrise
-## [code]sunset_today[/code] - the [GameTime] of today's sunset
-## [code]end_of_day[/code] - the [GameTime] of the end of the current day
-## [code]sunrise_tomorrow[/code] - the [GameTime] of tomorrow's sunrise
+## Returns a dictionary of times that are milestones. This includes:[br]
+## [br][code]sunset_yesterday[/code] - the [GameTime] of yesterday's sunset
+## [br][code]start_of_day[/code] - the [GameTime] of the start of the current day
+## [br][code]sunrise_today[/code] - the [GameTime] of today's sunrise
+## [br][code]sunset_today[/code] - the [GameTime] of today's sunset
+## [br][code]end_of_day[/code] - the [GameTime] of the end of the current day
+## [br][code]sunrise_tomorrow[/code] - the [GameTime] of tomorrow's sunrise
 func get_milestone_times() -> Dictionary:
 	return {
 		"sunset_yesterday": _sunset_yesterday,
@@ -337,20 +348,20 @@ func get_milestone_times() -> Dictionary:
 		"sunrise_tomorrow": _sunrise_tomorrow
 	}
 
-## This pauses the passage of time. If the time has not already been paused, this will emit [code]on_time_paused[/code]
+## This pauses the passage of time. If the time has not already been paused, this will emit [code]on_time_paused[/code].
 func stop_time() -> void:
 	if !_time_stopped:
 		_on_time_paused.on_next(_time_stopped)
 	_time_stopped = true
 
-## This resumes the passage of time. If the time has already been paused, this will emit [code]on_time_resumed[/code]
+## This resumes the passage of time. If the time has already been paused, this will emit [code]on_time_resumed[/code].
 func start_time() -> void:
 	if _time_stopped:
 		_on_time_resumed.on_next(_time_stopped)
 	_time_stopped = false
 
 ## This will overwrite the current [DayConfig] with the [param config]. If the [param config] is the same as the current [DayConfig] then this will do nothing.
-## If the [DayConfig] is successfully set then this will emit [code]on_day_config_change[/code]
+## If the [DayConfig] is successfully set then this will emit [code]on_day_config_change[/code].
 func set_day_config(config: DayConfig) -> void:
 	if config == null:
 		return
@@ -375,10 +386,10 @@ func set_new_scheduler(scheduler: DayScheduler, overwrite_day_config: bool = fal
 		set_day_config(day_scheduler.get_current_day_config())
 
 ## Overwrites the current [GameTime] with the [param time].
-## [param new_day_config] and [param new_scheduler] are optional values
-## If [param new_day_config] is provided, it will set the current [DayConfig] to that value
-## If [param new_scheduler] is provided, it will set the current [DayScheduler] to that value
-## If both [param new_day_config] and [param new_scheduler] are provided, it will set the current [DayConfig] to [param new_day_config] and [DayScheduler] will take effect the next day
+## [param new_day_config] and [param new_scheduler] are optional values.
+## If [param new_day_config] is provided, it will set the current [DayConfig] to that value.
+## If [param new_scheduler] is provided, it will set the current [DayScheduler] to that value.
+## If both [param new_day_config] and [param new_scheduler] are provided, it will set the current [DayConfig] to [param new_day_config] and [DayScheduler] will take effect the next day.
 ## This will not emit any events except for [code]on_day_config_change[/code] and [code]on_day_scheduler_change[/code] if they are different from the respective current values are.
 func set_time(time: GameTime, new_day_config: DayConfig = null, new_scheduler: DayScheduler = null) -> void:
 	_current_date_at_start_of_day = GameTime.create_from_instant(Instant.new(
@@ -406,6 +417,8 @@ func set_time(time: GameTime, new_day_config: DayConfig = null, new_scheduler: D
 			day_scheduler.verify()
 			if day_scheduler.get_current_index() < 0:
 				set_day_config(day_scheduler.advance_and_get_day_config())
+			else:
+				set_day_config(day_scheduler.get_current_day_config())
 			if day_scheduler.is_done():
 				_end_current_scheduler()
 		else:
@@ -426,26 +439,29 @@ func set_time(time: GameTime, new_day_config: DayConfig = null, new_scheduler: D
 	_is_day = (_percentage_through_day >= _sunrise_start_percentage) && (_percentage_through_day < _sunset_start_percentage)
 	_calculate_milestone_times()
 
-	if sun:
-		sun.rotation.x = deg_to_rad(get_sun_rotation().x)
-		sun.set_color(get_light_color(0,true))
-		sun.light_energy = calculate_light_intesity()
+	if sun_3d:
+		sun_3d.rotation.x = deg_to_rad(get_sun_rotation().x)
+		sun_3d.set_color(get_light_color(0,true))
+		sun_3d.light_energy = calculate_light_intesity()
+	if sun_2d != null:
+		sun_2d.set_color(get_light_color(0,true))
+		sun_2d.energy = calculate_light_intesity() if _is_day else 0.0
 	if environment != null:
 		environment.environment.ambient_light_energy = calculate_light_intesity() if !_is_day else 0
 
-## Returns the current [GameTime]
+## Returns the current [GameTime].
 func get_time_this_frame() -> GameTime:
 	return _game_time_this_frame
 
-## Returns the current time speed multiplier
+## Returns the current time speed multiplier.
 func get_time_speed_multiplier() -> float:
 	return _time_speed_multiplier
 
-## Returns the calculated light color for the current frame
-## This is used automatically if the sun/environment is provided to set the color
+## Returns the calculated light color for the current frame.
+## This is used automatically if the sun/environment is provided to set the color.
 func get_light_color(delta: float, immediate: bool = false) -> Color:
 	if (_color_lerp_time > 1):
-		return sun.get_color();
+		return sun_3d.get_color();
 	_color_lerp_time += (delta / (day_lenth_in_seconds * _AUTO_COLOR_TRANSTION)) * _time_speed_multiplier
 	var new_color: Color
 	if _active_weather != null:
@@ -459,10 +475,11 @@ func get_light_color(delta: float, immediate: bool = false) -> Color:
 		_color_lerp_time=2
 		return new_color
 	else:
-		return lerp(sun.get_color(), new_color, _color_lerp_time) as Color
+		var current_color =  sun_2d.color if sun_2d != null else sun_3d.light_color
+		return lerp(current_color, new_color, _color_lerp_time) as Color
 
-## Returns the calculated light intensity for the current frame
-## This is used automatically if the sun/environment is provided to set the light intensity
+## Returns the calculated light intensity for the current frame.
+## This is used automatically if the sun/environment is provided to set the light intensity.
 func calculate_light_intesity() -> float:
 	var intensity: float
 	var min_intensity: float
@@ -477,8 +494,8 @@ func calculate_light_intesity() -> float:
 		min_intensity = _day_config.minimum_light_intensity
 	return clampf(intensity * _get_light_intensity_percentage(), min_intensity, _MAX_LIGHT_INTENSITY_POSSIBLE)
 
-## Returns the current sun rotation in degrees for the current frame
-## This is used automatically if the sun/environment is provided
+## Returns the current sun rotation in degrees for the current frame.
+## This is used automatically if the sun/environment is provided.
 func get_sun_rotation() -> Vector3:
 	var angle: float
 
@@ -504,16 +521,16 @@ func get_sun_rotation() -> Vector3:
 
 	return Vector3(angle+ 180,0, 0)
 
-## Returns [code]true[/code] if it is night time but before midnight, [code]false[/code] if it is day time or night time after midnight
+## Returns [code]true[/code] if it is night time but before midnight, [code]false[/code] if it is day time or night time after midnight.
 func is_night_before_midnight() -> bool:
 	if is_day():
 		return false
 	return _percentage_through_day >= _sunset_start_percentage
 
-## Returns a dictionary of the current reminders. This does not include any reminder before the current [GameTime]
-## Because subscriptions to reminders are not persisted, they will be lost if the game/scene is closed and re-opened
-## This will give a list of the current reminders in order to resubscribe to them upon re-opening the game/scene
-## In order to restore the state, call [method create_reminders] with the normal reminders and the repeating reminders values from this dictionary
+## Returns a dictionary of the current reminders. This does not include any reminder before the current [GameTime].
+## Because subscriptions to reminders are not persisted, they will be lost if the game/scene is closed and re-opened.
+## This will give a list of the current reminders in order to resubscribe to them upon re-opening the game/scene.
+## In order to restore the state, call [method create_reminders] with the normal reminders and the repeating reminders values from this dictionary.
 func save_reminders() -> Dictionary:
 	var reminders: Array[Variant] = []
 	for reminder in _reminders.values():
@@ -530,8 +547,8 @@ func save_reminders() -> Dictionary:
 
 ## Returns the current state of the [DayNightCycle] as a JSON string.
 ## [b]THIS DOES NOT INCLUDE REMINDERS.[/b]
-## Use [method save_reminders] to save reminders as they need to be re-subscribed to and that cannot be done automatically
-## [br]The JSON formatted [String] can be used by the [method load_from_json] in order to restore the state of the [DayNightCycle]
+## Use [method save_reminders] to save reminders as they need to be re-subscribed to and that cannot be done automatically.
+## [br]The JSON formatted [String] can be used by the [method load_from_json] in order to restore the state of the [DayNightCycle].
 func save() -> String:
 	var save_object: Dictionary = {
 		"game_version": _GAME_VERSION,
@@ -554,9 +571,9 @@ func save() -> String:
 
 ## Loads the state of the [DayNightCycle] from a JSON formatted [String] created by the [method save] function.
 ## This will not restore the state of the reminders.
-## This will error if the JSON is invalid
-## This could potentially error if the [code]game_version[/code] or [code]plugin_version[/code] in the JSON is invalid/does not match
-## Returns [code]true[/code] if successful, [code]false[/code] if not
+## This will error if the JSON is invalid.
+## This could potentially error if the [code]game_version[/code] or [code]plugin_version[/code] in the JSON is invalid/does not match.
+## Returns [code]true[/code] if successful, [code]false[/code] if not.
 func load_from_json(data_string: String) -> bool:
 	var data = JSON.parse_string(data_string)
 	if not data is Dictionary:
@@ -590,8 +607,8 @@ func load_from_json(data_string: String) -> bool:
 	set_time(_game_time_this_frame)
 	return true
 
-## This will remove a reminder at the specified [param time] and optionally the [param name]
-## If [param name] is not specified, all reminders at that time will be removed
+## This will remove a reminder at the specified [param time] and optionally the [param name].
+## If [param name] is not specified, all reminders at that time will be removed.
 func remove_reminder(time: GameTime, name: String = "") -> void:
 	if _reminders.has(time.get_date_as_string()):
 		if (name != "") && _reminders.get(time.get_date_as_string()).name == name:
@@ -637,8 +654,8 @@ func remove_reminder_by_name(name: String) -> void:
 	_reset_reminders_for_today()
 
 ## Removes the current [DayScheduler] if it is set.
-## If [param remove_day_config] is true, it will also remove the current [DayConfig]
-## If [param remove_day_config] is false, it will keep the current [DayConfig] which will be changed on the next day change
+## If [param remove_day_config] is true, it will also remove the current [DayConfig].
+## If [param remove_day_config] is false, it will keep the current [DayConfig] which will be changed on the next day change.
 func remove_current_scheduler(remove_day_config: bool = false) -> void:
 	if day_scheduler == null:
 		return
@@ -647,7 +664,7 @@ func remove_current_scheduler(remove_day_config: bool = false) -> void:
 	_end_current_scheduler()
 
 ## Sets the current [DayConfig] to the [DayNightCycle] default day config. See [method set_current_day_config] if you would like to change the current [DayConfig] to a different one.
-## The the current [DayConfig] is the default [DayConfig], nothing will happen
+## The the current [DayConfig] is the default [DayConfig], nothing will happen.
 func remove_current_day_config() -> void:
 	if _day_config.get_instance_id() == default_day_config.get_instance_id():
 		return
@@ -661,7 +678,7 @@ func remove_current_day_period() -> void:
 	_end_active_period()
 
 ## Removes the current [WeatherConfig] if it is set. This does not change the the current [DayPeriodConfig].
-## See [method remove_current_day_period] if you would like to end the current [DayPeriodConfig]
+## See [method remove_current_day_period] if you would like to end the current [DayPeriodConfig].
 func remove_current_weather() -> void:
 	if _active_weather == null:
 		return
@@ -694,10 +711,10 @@ func create_reminder(time: GameTime,name: String, repeating: bool = false) -> Ob
 	return observable.as_observable()
 
 ## Changes the time speed multiplier to the specified [param time_multiplier].
-## If [param time_multiplier] is less than 0.1, it will log an error and not change the time speed
-## If [param time_multiplier] is greater than the [DayNightCycle] constant _MAX_TIME_MULTIPLIER, it will log an error and not change the time speed
-## If [param time_to_stop_at] is specified, the time speed multiplier will be reset to the default time speed on the first tick past the specified [param time_to_stop_at]
-## If [param time_to_stop_at] is specified and the time is before the current [GameTime], it will log an error and not change the time speed
+## If [param time_multiplier] is less than 0.1, it will log an error and not change the time speed.
+## If [param time_multiplier] is greater than the [DayNightCycle] constant _MAX_TIME_MULTIPLIER, it will log an error and not change the time speed.
+## If [param time_to_stop_at] is specified, the time speed multiplier will be reset to the default time speed on the first tick past the specified [param time_to_stop_at].
+## If [param time_to_stop_at] is specified and the time is before the current [GameTime], it will log an error and not change the time speed.
 func alter_time_speed(time_multiplier: float, time_to_stop_at: GameTime = null)-> void:
 	if time_multiplier < 0.1:
 		push_error("Invalid time multiplier: " + str(time_multiplier))
@@ -713,7 +730,7 @@ func alter_time_speed(time_multiplier: float, time_to_stop_at: GameTime = null)-
 	_on_time_speed_change.on_next(time_multiplier)
 	_time_speed_multiplier = time_multiplier
 
-## Resets the time speed multiplier to the default
+## Resets the time speed multiplier to the default.
 ## If [param should_fire_time_speed_end_event] is [code]true[/code], it will fire the time speed end event
 func reset_default_time_speed(should_fire_time_speed_end_event: bool = false) -> void:
 	if should_fire_time_speed_end_event:
@@ -811,7 +828,7 @@ func _set_active_period(period: DayPeriodConfig) -> void:
 			_active_weather = possible_weather
 			_on_weather_start.on_next(_active_weather)
 
-## This will end the active period
+## This will end the active period.
 ## This assumes that there is an active period to avoid double checking the same thing
 func _end_active_period() -> void:
 	if _active_weather != null:
@@ -821,14 +838,14 @@ func _end_active_period() -> void:
 	_on_day_period_end.on_next(old_period)
 	_color_lerp_time = 0
 
-## This will end the active weather
+## This will end the active weather.
 ## This assumes that there is active weather to avoid double checking the same thing
 func _end_active_weather() -> void:
 	var old_weather: WeatherConfig = _active_weather
 	_active_weather = null
 	_on_weather_end.on_next(old_weather)
 
-## This will end the active scheduler
+## This will end the active scheduler.
 ## This assumes that there is an active scheduler to avoid double checking the same thing
 func _end_current_scheduler() -> void:
 	var old_scheduler: DayScheduler = day_scheduler

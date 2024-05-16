@@ -41,10 +41,10 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("SphereMesh_kmr42")
 
-[node name="DayNightCycle" type="Node" parent="." node_paths=PackedStringArray("sun", "environment")]
+[node name="DayNightCycle" type="Node" parent="." node_paths=PackedStringArray("sun_3d", "environment")]
 script = ExtResource("1_fe7bq")
 default_day_config = ExtResource("2_kh4i3")
-sun = NodePath("../Sun")
+sun_3d = NodePath("../Sun")
 environment = NodePath("../WorldEnvironment")
 day_scheduler = ExtResource("3_xcuvk")
 day_lenth_in_seconds = 30

@@ -5,8 +5,8 @@
 
 [resource]
 script = ExtResource("1_0vd3m")
-has_night = true
 day_name = "Normal"
+day_weight = 1
 day_color = Color(0.894118, 0.92549, 0.584314, 1)
 day_time_light_intensity = 5.0
 night_color = Color(0.0823529, 0.0352941, 0.513726, 1)
@@ -20,4 +20,4 @@ sunset_hour = 18
 sunset_minute = 0
 sunset_second = 0
 sunset_millisecond = 0
-day_periods = Array[Resource]([ExtResource("1_1ppfd")])
+day_periods = Array[Resource("res://addons/day_night/resources/scripts/day_period_config.gd")]([ExtResource("1_1ppfd")])

@@ -1,3 +1,4 @@
+@icon("res://addons/day-period-logo.svg")
 extends Resource
 class_name DayPeriodConfig
 

@@ -4,14 +4,13 @@
 
 [resource]
 script = ExtResource("1_un416")
-has_night = true
 day_name = ""
+day_weight = 1
 day_color = Color(0.839216, 0, 0.917647, 1)
 day_time_light_intensity = 4.0
 night_color = Color(0.835294, 0, 0.933333, 1)
 night_time_light_intensity = 2.0
 minimum_light_intensity = 0.5
-day_weight = 1
 sunrise_hour = 10
 sunrise_minute = 0
 sunrise_second = 0
